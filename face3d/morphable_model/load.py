@@ -74,24 +74,25 @@ def load_BSM(config_path):
     # kpt ind
     kpt_3d = np.loadtxt(path[3])
     expPC =np.loadtxt(path[4])
+    core = np.fromfile(path[5], dtype = float)
+    Uexp =  np.loadtxt(path[6])
+
+    #reduced core size : n_ver x 50 x 47
+    core = core.reshape([-1, 150, 47])
+    core = core[:,:50,:]
+    
 
     model = {}
 
-    #model['core'] = core  
-    #model['tri'] = triangles.copy(order = 'C').astype(np.int32) - 1 
-    #model['shapeEV'] = shapeEV.astype(np.float32)
+    model['core'] = core  
     model['tri'] = triangles.copy(order = 'C').astype(np.int32) -1
     model['kpt_ind'] = (np.squeeze(np.copy(kpt_3d[:,1]))).astype(np.int32)
     model['shapeMU'] = expPC[:,:1].astype(np.float32)
-    #shapeMU = model['shapeMU'][:,0]
-    #model['shapeMU'] = shapeMU
     model['expPC'] = (expPC[:, 1:]- expPC[:, :1]).astype(np.float32)
-    #model['expPC'] = (expPC[:, 1:]- shapeMU).astype(np.float32)
-    #model['expPC'] = (expPC[:, 1:]).astype(np.float32)
     model['shapePC'] = shapePC.astype(np.float32)
     model['shapeEV'] = shapeEV.reshape(-1,1).astype(np.float32)
     model['expEV'] = np.ones([expPC.shape[1] - 1,1]).astype(np.float32)
-    #model['shapeMU'] = model['expMU']
+    model['Uexp'] = Uexp.astype(np.float32) 
     return model
 
 

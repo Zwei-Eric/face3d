@@ -130,7 +130,13 @@ class  MorphabelModel(object):
     def transform_3ddfa(self, vertices, s, angles, t3d): # only used for processing 300W_LP data
         R = mesh.transform.angle2matrix_3ddfa(angles)
         return mesh.transform.similarity_transform(vertices, s, R, t3d)
+    
+    def fit_specific_blendshapes(self, xl, X_ind, max_iter):
+        wid = fit.fit_specific_id_param(xl, X_ind, self.model, max_iter = max_iter)
+        expPC = fit.fit_blendshapes(self.model, wid, self.nver)
+        return expPC
 
+    
     # --------------------------------------------------- fitting
     def fit(self, x, X_ind, max_iter = 4, isShow = False, model_type = 'BFM'):
         ''' fit 3dmm & pose parameters
