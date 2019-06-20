@@ -44,22 +44,39 @@ light_intens = np.array([[1,1,1]])
 light_pos = np.array([[0, 0, 300]])
 
 
+
+
+
+# --- 2. video setup
+cap = cv2.VideoCapture("../Data/videoplayback.mp4")
+fps = cap.get(cv2.CAP_PROP_FPS)
+w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+
 #for img in images:
 # for cnt, img in enumerate(images)
 
 imgs = []
 xl = []
-for i in range(60):
-    path = "../Data/exp_input/exp_input"
-    path = path + str(i) + ".jpg"
-    img = io.imread(path)
-    imgs.append(img)
+while(cap.isOpened()):
+    ret , frame = cap.read()
+    if not ret:
+        print("input images numbers: ", len(imgs))
+        print("load video overed")
+        break;
+    imgs.append(np.array(frame))
+   
+ 
+
 #img = io.imread("../Data/qtest1.jpg")
 #imgs.append(img)
 #img = io.imread("../Data/qtest2.jpg")
 #imgs.append(img)
 
 for idx, img in enumerate(imgs):
+    if idx % 2 != 0:
+        continue
     img_target = img.copy()[:,:,:3]
     img_target = cv2.cvtColor(img_target, cv2.COLOR_BGR2RGB)
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -85,8 +102,8 @@ for idx, img in enumerate(imgs):
     x[:,1] = h / 2.0 - x[:, 1] - 1
     xl.append(x)
 #fit mesh
-
-expPC= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3)
+print("{} faces detected".format(len(xl)))
+expPC= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 4)
 #print("fitted_info",ret)
 #fitted_vertices = np.float32(bsm.generate_vertices(fitted_sp, fitted_ep))
 #np.savetxt("f_ep", fitted_ep)

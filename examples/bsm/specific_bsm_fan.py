@@ -21,14 +21,20 @@ from face3d.morphable_model import MorphabelModel
 import dlib
 import timeit
 import cv2
+import face_alignment
+
 
 
 # --------------------- Forward: parameters(shape, expression, pose) --> 3D obj --> 2D image  ---------------
 # --- 1. load model
 bsm = MorphabelModel('../Data/BSM/config', model_type = 'BSM')
 print('init bsm model success')
-detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor('../Data/dlib/shape_predictor_68_face_landmarks.dat')
+#detector = dlib.get_frontal_face_detector()
+#predictor = dlib.shape_predictor('../Data/dlib/shape_predictor_68_face_landmarks.dat')
+fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False)
+
+
+
 print(bsm.model['shapePC'].shape)
 print("triangles shape", bsm.triangles.shape)
 # -------------------- Back:  2D image points and corresponding 3D vertex indices-->  parameters(pose, shape, expression) ------
@@ -44,36 +50,56 @@ light_intens = np.array([[1,1,1]])
 light_pos = np.array([[0, 0, 300]])
 
 
+
+
+
+# --- 2. video setup
+cap = cv2.VideoCapture("../Data/videoplayback.mp4")
+fps = cap.get(cv2.CAP_PROP_FPS)
+w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+
 #for img in images:
 # for cnt, img in enumerate(images)
 
 imgs = []
 xl = []
-for i in range(60):
-    path = "../Data/exp_input/exp_input"
-    path = path + str(i) + ".jpg"
-    img = io.imread(path)
-    imgs.append(img)
+while(cap.isOpened()):
+    ret , frame = cap.read()
+    if not ret:
+        print("input images numbers: ", len(imgs))
+        print("load video overed")
+        break;
+    imgs.append(np.array(frame))
+   
+ 
+
 #img = io.imread("../Data/qtest1.jpg")
 #imgs.append(img)
 #img = io.imread("../Data/qtest2.jpg")
 #imgs.append(img)
 
 for idx, img in enumerate(imgs):
+    if idx % 3 != 0:
+        continue
     img_target = img.copy()[:,:,:3]
     img_target = cv2.cvtColor(img_target, cv2.COLOR_BGR2RGB)
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     h, w= img_gray.shape[:2]
-    faces = detector(img_gray,0)
-    print("img shape", img_target.shape)
+    #faces = detector(img_gray,0)
+    #print("img shape", img_target.shape)
     x = np.zeros([68,2])
-    
-    if len(faces) != 0:
+    faces = fa.get_landmarks(img_target) 
+    if faces is None:
+        print("image {} no face detected".format(idx))
+        continue
+    elif len(faces) != 0:
         for i in range(len(faces)):
-            landmarks = np.matrix([[p.x, p.y] for p in predictor(img_gray, faces[i]).parts()])
+            landmarks = faces[i]
             for idx, point in enumerate(landmarks):
                 # position of 68 key points
-                pos = (point[0,0], point[0,1])          # notice the size of w:[0,0] h;[0,1]
+                pos = (int(point[0]), int(point[1]))       # notice the size of w:[0,0] h;[0,1]
                 x[idx] = pos
     
                 rr, cc = draw.circle_perimeter(pos[1], pos[0], 2)
@@ -85,7 +111,7 @@ for idx, img in enumerate(imgs):
     x[:,1] = h / 2.0 - x[:, 1] - 1
     xl.append(x)
 #fit mesh
-
+print("{} faces detected".format(len(xl)))
 expPC= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3)
 #print("fitted_info",ret)
 #fitted_vertices = np.float32(bsm.generate_vertices(fitted_sp, fitted_ep))

@@ -7,7 +7,7 @@ import scipy.io as sio
 from .. import mesh
 from . import fit
 from . import load
-
+from . import blendshapes
 class  MorphabelModel(object):
     """docstring for  MorphabelModel
     model: nver: number of vertices. ntri: number of triangles. *: must have. ~: can generate ones array for place holder.
@@ -132,8 +132,10 @@ class  MorphabelModel(object):
         return mesh.transform.similarity_transform(vertices, s, R, t3d)
     
     def fit_specific_blendshapes(self, xl, X_ind, max_iter):
-        wid = fit.fit_specific_id_param(xl, X_ind, self.model, max_iter = max_iter)
-        expPC = fit.fit_blendshapes(self.model, wid, self.nver)
+        #wid = blendshapes.fit_specific_id_param(xl, X_ind, self.model, max_iter = max_iter)
+        wid = blendshapes.fit_id_param_bfgs(xl, X_ind, self.model, max_iter = max_iter)
+        #wid = np.loadtxt("wid.out")
+        expPC = blendshapes.fit_blendshapes(self.model, wid, self.nver)
         return expPC
 
     
