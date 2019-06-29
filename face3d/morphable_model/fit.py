@@ -357,8 +357,8 @@ def fit_points_BSM(x, X_ind, model, n_ep, max_iter = 4):
         #----- estimate pose
         P = mesh.transform.estimate_affine_matrix_3d22d(X.T, x.T)
         s, R, t = mesh.transform.P2sRt(P)
-        fe = fitting_error(x, X, s, R, t[:2])
-        print("fitting error:", fe)
+        #fe = fitting_error(x, X, s, R, t[:2])
+        #print("fitting error:", fe)
         rx, ry, rz = mesh.transform.matrix2angle(R)
         print('Iter:{}; estimated pose: s {}, rx {}, ry {}, rz {}, t1 {}, t2 {}'.format(i, s, rx, ry, rz, t[0], t[1]))
 
@@ -370,5 +370,65 @@ def fit_points_BSM(x, X_ind, model, n_ep, max_iter = 4):
         ep = estimate_expression_bsm(x, shapeMU, expPC, shapeEV, s, R, t[:2], lamb = 20 )
         #print("exp para", ep[:20])
     return ep, s, R, t
+
+def fit_exp_bfgs(x, X_ind, wid, model, max_iter=4):
+    '''
+    Args:
+        x: (n, 2) image points
+        X_ind: (n,) corresponding Model vertex indices
+        max_iter: iteration
+    Returns:
+    '''
+    # -- init
+    # -------------------- estimate
+    X_ind_all = np.tile(X_ind[np.newaxis, :], [3, 1]) * 3
+    X_ind_all[1, :] += 1
+    X_ind_all[2, :] += 2
+    valid_ind = X_ind_all.flatten('F')
+
+
+    core = model['core'][valid_ind, :, :]
+  
+    wexp = np.random.rand(core.shape[2])
+    n = x.shape[0]
+ 
+    for i in range(max_iter):
+        fe = 0
+        #Ml = []
+        #Ql = []
+        #shapePC_l = []
+        X = tensor.dot.mode_dot(core, wid.T, 1)
+        X = tensor.dot.mode_dot(X, wexp.T ,1)
+        X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+        x = x.T 
+
+        P = mesh.transform.estimate_affine_matrix_3d22d(X.T, x.T)
+        s, R, t = mesh.transform.P2sRt(P)
+            #----- estimate wid & wexp
+            # shape wid
+            #shapePC = tensor.dot.mode_dot(core, wexpl[j].T ,2)
+            
+       
+       
+        bnds_exp = ((0,1),) * core.shape[2]
+        args = (  # a_star, M, Q, x, X
+            x,
+            core,
+            wid,
+            #Q,
+            #posit_M
+            s,
+            R,
+            t[:2]
+        )
+        res = bfgs(fitting_error_wexp, wexp, args=args, bounds=bnds_exp, options={
+            'disp': False, 'maxcor': 10, 'ftol': 2.220446049250313e-09, 'gtol': 1e-05, 'eps': 1e-08, 'maxfun': 15000,
+            'maxiter': 15000, 'iprint': -1, 'maxls': 20
+        })
+        wexp = res.x.reshape((-1))
+        print("image {} single exp error:".format(j), np.aqrt(res.fun / m) ) 
+       
+
+    return wexp
 
 

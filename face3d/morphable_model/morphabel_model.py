@@ -83,7 +83,7 @@ class  MorphabelModel(object):
         return vertices
 
     def generate_vertices_bsm(self, exp_para):
-        vertices = self.model['shapeMU']  + self.model['expPC'].dot(exp_para)
+        vertices = self.model['expPC'].dot(exp_para)
         vertices = np.reshape(vertices, [int(3), int(len(vertices)/3)], 'F').T
         return vertices 
 
@@ -136,11 +136,11 @@ class  MorphabelModel(object):
         wid = blendshapes.fit_id_param_bfgs(xl, X_ind, self.model, max_iter = max_iter)
         #wid = np.loadtxt("wid.out")
         expPC = blendshapes.fit_blendshapes(self.model, wid, self.nver)
-        return expPC
+        return expPC, wid
 
     
     # --------------------------------------------------- fitting
-    def fit(self, x, X_ind, max_iter = 4, isShow = False, model_type = 'BFM'):
+    def fit(self, x, X_ind, max_iter = 4, isShow = False, model_type = 'BFM', method = 'default'):
         ''' fit 3dmm & pose parameters
         Args:
             x: (n, 2) image points
@@ -163,7 +163,10 @@ class  MorphabelModel(object):
                 angles = mesh.transform.matrix2angle(R)
             return fitted_sp, fitted_ep, s, angles, t
         elif model_type == 'BSM':
-            fitted_ep, s, R, t = fit.fit_points_BSM(x, X_ind, self.model, n_ep = self.n_exp_para, max_iter = max_iter)
+            if method == 'bfgs':
+                fitted_ep, s, R, t = fit.fit_exp_bfgs(x, X_ind, self.model, n_ep = self.n_exp_para, max_iter = max_iter)
+            else:
+                fitted_ep, s, R, t = fit.fit_points_BSM(x, X_ind, self.model, n_ep = self.n_exp_para, max_iter = max_iter)
             angles = mesh.transform.matrix2angle(R)
             return fitted_ep, s, angles, t
 
