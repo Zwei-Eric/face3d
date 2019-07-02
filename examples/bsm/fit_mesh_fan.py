@@ -33,7 +33,7 @@ print('init bsm model success')
 #print("triangles shape", bsm.triangles.shape)
 
 
-fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D,  device = 'cuda')
+fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D,  device = 'cuda', flip_input = False)
 
 # -------------------- Back:  2D image points and corresponding 3D vertex indices-->  parameters(pose, shape, expression) ------
 ## only use 68 key points to fit
@@ -52,7 +52,7 @@ light_pos = np.array([[0, 0, 300]])
 # for cnt, img in enumerate(images)
 
 
-img = io.imread("../Data/zwtest3.jpg")
+img = io.imread("../Data/pose39e0.png")
 img_target = img.copy()[:,:,:3]
 img_target = cv2.cvtColor(img_target, cv2.COLOR_BGR2RGB)
 img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -81,7 +81,7 @@ print("fitted_s",fitted_s)
 print("fitted_angles", fitted_angles)
 print("fitted_t", fitted_t[:2])
 fitted_vertices = np.float32(bsm.generate_vertices_bsm(fitted_ep))
-np.savetxt("f_ep", fitted_ep)
+#np.savetxt("f_ep", fitted_ep)
 #fitted_vertices = np.reshape(bsm.model['expPC'][:,0], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
 #fitted_vertices += np.reshape(bsm.model['expMU'], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
 #np.savetxt('verices', fitted_vertices)

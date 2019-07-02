@@ -1,8 +1,3 @@
-''' 3d morphable model example
-3dmm parameters --> mesh 
-fitting: 2d image + 3dmm -> 3d face
-use dlib for feature landmark detection
-'''
 import os, sys
 import subprocess
 import numpy as np
@@ -31,7 +26,7 @@ bsm = MorphabelModel('../Data/BSM/config', model_type = 'BSM')
 print('init bsm model success')
 #detector = dlib.get_frontal_face_detector()
 #predictor = dlib.shape_predictor('../Data/dlib/shape_predictor_68_face_landmarks.dat')
-fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False)
+fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._3D, flip_input=False)
 
 
 
@@ -109,13 +104,14 @@ for idx, img in enumerate(imgs):
     xl.append(x)
 #fit mesh
 print("{} faces detected".format(len(xl)))
-expPC, wid , ys= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3)
+expPC= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3)
 #print("fitted_info",ret)
 #fitted_vertices = np.float32(bsm.generate_vertices(fitted_sp, fitted_ep))
 #np.savetxt("f_ep", fitted_ep)
 #fitted_vertices = np.reshape(bsm.model['expPC'][:,0], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
 #fitted_vertices += np.reshape(bsm.model['expMU'], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
-np.savetxt('qz/wid_with_update.out', wid)
+#np.savetxt('verices', fitted_vertices)
+
 
 
 obj = objloader.obj.objloader('pose_0.obj')
@@ -123,7 +119,7 @@ obj = objloader.obj.objloader('pose_0.obj')
 for i in range(47):
     vert = expPC[:,i]
     obj.vertices = vert
-    obj.save('qz/exp_{}.obj'.format(i))
+    obj.save('exp_{}.obj'.format(i))
 
 #
 #

@@ -66,9 +66,9 @@ fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
 imgs = []
 xl = []
 
-for i in range(60):
-    path = "../Data/exp_input/exp_input"
-    path = path + str(i) + ".jpg"
+for i in range(20):
+    path = "/root/data/facewarehouse_data/Tester_39/TrainingPose/pose_"
+    path = path + str(i) + ".png"
     img = io.imread(path)
     imgs.append(img)
 
@@ -109,21 +109,21 @@ for idx, img in enumerate(imgs):
     xl.append(x)
 #fit mesh
 print("{} faces detected".format(len(xl)))
-expPC, wid , ys= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3)
+expPC, wid, ys= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3)
 #print("fitted_info",ret)
 #fitted_vertices = np.float32(bsm.generate_vertices(fitted_sp, fitted_ep))
 #np.savetxt("f_ep", fitted_ep)
 #fitted_vertices = np.reshape(bsm.model['expPC'][:,0], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
 #fitted_vertices += np.reshape(bsm.model['expMU'], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
-np.savetxt('qz/wid_with_update.out', wid)
-
+np.savetxt('pose39v2/wid_with_update.out', wid)
+#np.savetxt('pose39v2/countour_position.out', ys)
 
 obj = objloader.obj.objloader('pose_0.obj')
 
 for i in range(47):
     vert = expPC[:,i]
     obj.vertices = vert
-    obj.save('qz/exp_{}.obj'.format(i))
+    obj.save('pose39v2/exp_{}.obj'.format(i))
 
 #
 #
