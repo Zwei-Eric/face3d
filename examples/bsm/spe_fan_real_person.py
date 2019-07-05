@@ -45,13 +45,16 @@ X_ind = bsm.kpt_ind # index of keypoints in 3DMM. fixed.
 
 
 
-folder = 'zzw_3D/'
+folder = 'xd_3D/'
 
 # ------ light setup
 print("nver", bsm.nver)
-colors = np.tile([0.8,0.8,0.8],(int(bsm.nver),1))
-light_intens = np.array([[0.8,1,0.8]])
-light_pos = np.array([[0, 0, 300]])
+colors = np.tile([0.8,0.2,0.2],(int(bsm.nver),1))
+light_intens = np.array([[1.0 ,1.0 ,1.0]])
+light_pos = np.array([[0, 0, 1000]])
+light_pos2 = np.array([[-700, 0, 1000]])
+light_pos3 = np.array([[700,0 , 1000]])
+light_pos4 = np.array([[0, -700 , 1000]])
 
 
 
@@ -72,7 +75,7 @@ xl = []
 
 for i in range(60):
     #path = "../../../facewarehouse_data/Tester_39/TrainingPose/pose_"
-    path = "../Data/exp_input/exp_inpu"
+    path = "../Data/exp_input/exp_input"
     path = path + str(i) + ".jpg"
     img = io.imread(path)
     imgs.append(img[:,:,:3])
@@ -129,7 +132,7 @@ obj = objloader.obj.objloader('pose_0.obj')
 for i in range(47):
     vert = expPC[:,i]
     obj.vertices = vert
-    obj.save('zzw_3D/exp_{}.obj'.format(i))
+    obj.save('xd_3D/exp_{}.obj'.format(i))
 
 
 for idx, img in enumerate(imgs):
@@ -141,18 +144,47 @@ for idx, img in enumerate(imgs):
     cv2.imwrite(path, img)
     path = folder + "fitted_mesh" + str(idx) + ".obj"
     vert = bsm.generate_fitting_mesh(wid, wexpl[idx])
+    
+    # normalize
+    #pmax = vert.max()
+    #pmin = vert.min()
+    #vert = (vert - pmin) / (pmax - pmin)
+    
+    # save mesh to .obj file
     obj.vertices = vert
     obj.save(path)
     
     vert = np.reshape(vert, [int(3), int(len(vert)/ 3)], 'F').T 
     trans_vert = bsm.similarity_transform(vert, sl[idx], Rl[idx], tl[idx])
-    lit_colors = mesh.light.add_light(trans_vert, bsm.triangles, colors, light_pos, light_intens)
+    lit_colors1 = mesh.light.add_light(trans_vert, bsm.triangles, colors, light_pos, light_intens)
+    lit_colors2 = mesh.light.add_light(trans_vert, bsm.triangles, colors, light_pos2, light_intens)
+    lit_colors3 = mesh.light.add_light(trans_vert, bsm.triangles, colors, light_pos3, light_intens)
+    lit_colors4 = mesh.light.add_light(trans_vert, bsm.triangles, colors, light_pos4, light_intens)
+    lit_colors = (lit_colors1 + lit_colors2 + lit_colors3 + lit_colors4) / 4
+    
+    image_vertices = mesh.transform.to_image(trans_vert, h, w)
     image_vertices = mesh.transform.to_image(trans_vert, h, w)
 
     fitted_image = mesh.render.render_colors(image_vertices, bsm.triangles, lit_colors, h, w)
     fitted_image = np.minimum(np.maximum(fitted_image, -1) , 1)    
     fitted_image = (fitted_image * 255.0).astype('u1')
-    mesh_img = cv2.addWeighted(fitted_image, 2.5, cv2.cvtColor(imgs_c[idx], cv2.COLOR_RGB2BGR), 1, 0)
+    
+    
+    #  add mesh on top of the face 
+    bg_img = cv2.cvtColor(imgs_c[idx], cv2.COLOR_RGB2BGR)
+    gray = cv2.cvtColor(fitted_image, cv2.COLOR_BGR2GRAY)
+    ret, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV)
+    mask_inv = cv2.bitwise_not(mask)
+
+    img1_bg = cv2.bitwise_and(bg_img, bg_img, mask = mask)
+    img2_fg = cv2.bitwise_and(fitted_image, fitted_image, mask = mask_inv)
+
+    mesh_img = cv2.addWeighted(bg_img, 1, img2_fg, 3, 0)
+    path = folder + "mix_fitted_image" + str(idx) + ".jpg"
+    cv2.imwrite(path, mesh_img)
+    
+    
+    mesh_img = cv2.add(img1_bg, img2_fg)    
     path = folder + "fitted_image" + str(idx) + ".jpg"
     cv2.imwrite(path, mesh_img)
 
@@ -162,7 +194,6 @@ for idx, img in enumerate(imgs):
 
 
 np.savetxt("wid.out", wid)
-
 
 
 

@@ -220,8 +220,8 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
 
     core = model['core'][valid_ind, :, :]
     min_E = 1000
-    wid = np.random.rand(core.shape[1])
-    #wid = np.loadtxt("wid.out")
+    #wid = np.random.rand(core.shape[1])
+    wid = np.loadtxt("wid.out")
     #wid = np.ones(core.shape[1])
     wexp0 = np.random.rand(core.shape[2])
     #wexp0 = np.ones(core.shape[2])
