@@ -8,6 +8,7 @@ from .. import mesh
 from . import fit
 from . import load
 from . import blendshapes
+from .. import objloader
 class  MorphabelModel(object):
     """docstring for  MorphabelModel
     model: nver: number of vertices. ntri: number of triangles. *: must have. ~: can generate ones array for place holder.
@@ -127,18 +128,29 @@ class  MorphabelModel(object):
         R = mesh.transform.angle2matrix(angles)
         return mesh.transform.similarity_transform(vertices, s, R, t3d)
 
+    def similarity_transform(self, vertices, s, R, t3d):
+        return mesh.transform.similarity_transform(vertices, s, R, t3d)
+    
     def transform_3ddfa(self, vertices, s, angles, t3d): # only used for processing 300W_LP data
         R = mesh.transform.angle2matrix_3ddfa(angles)
         return mesh.transform.similarity_transform(vertices, s, R, t3d)
     
     def fit_specific_blendshapes(self, xl, X_ind, max_iter):
         #wid = blendshapes.fit_specific_id_param(xl, X_ind, self.model, max_iter = max_iter)
-        wid = blendshapes.fit_id_param_bfgs(xl, X_ind, self.model, max_iter = max_iter)
+        wid , wexpl, sl, Rl, tl= blendshapes.fit_id_param_bfgs(xl, X_ind, self.model, max_iter = max_iter)
         #wid = np.loadtxt("wid.out")
-        expPC = blendshapes.fit_blendshapes(self.model, wid, self.nver)
-        return expPC
-
+        expPC = blendshapes.generate_blendshapes(self.model, wid, self.nver)
+        return expPC, wid, wexpl , sl , Rl, tl
     
+    def show_fitting_result(self, X_ind, sl, Rl, tl ,wid, wexpl):
+        imgs = blendshapes.show_fitting_result(X_ind, self.model, sl, Rl, tl ,wid, wexpl)
+        return imgs
+ 
+    def generate_fitting_mesh(self, wid, wexp):
+        core = self.model['core']
+        return blendshapes.generate_mesh(core, wid, wexp )
+
+
     # --------------------------------------------------- fitting
     def fit(self, x, X_ind, max_iter = 4, isShow = False, model_type = 'BFM'):
         ''' fit 3dmm & pose parameters

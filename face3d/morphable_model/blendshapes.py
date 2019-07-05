@@ -1,19 +1,19 @@
 import numpy as np
 import cv2
-
+from skimage import draw
 from .. import tensor
 from .. import mesh
 
 
+from scipy.optimize import minimize
 
-def fitting_error_overall(wid, xl, core, wexpl, sl, Rl, t2dl):
+def fitting_error_overall(wid, xl, core, wexpl, sl, Rl, t3dl):
     '''
     Args:
         xl: m * (2, n) image points
         core tensor: (3n, n_id, n_exp) 
         Ml: m * (3, 4) camera external matrix
         Ql: m * (3, 3) projection matrix
-
     Returns:
         fe : fitting error
 
@@ -28,7 +28,7 @@ def fitting_error_overall(wid, xl, core, wexpl, sl, Rl, t2dl):
         x = xl[i].T
         n = x.shape[1]
     
-        t2d = np.array(t2dl[i])
+        t2d = np.array(t3dl[i][:2])
         P = np.array([[1, 0, 0], [0, 1, 0]], dtype = np.float32)
         A = sl[i]*P.dot(Rl[i])
     
@@ -180,7 +180,7 @@ def posit(X, x):
 
 
 
-def fit_blendshapes(model, wid, n_ver):
+def generate_blendshapes(model, wid, n_ver):
     n_exp = 47
     core = model['core']
     Uexp = model['Uexp']
@@ -193,11 +193,11 @@ def fit_blendshapes(model, wid, n_ver):
     #    Uexpd = np.dot(Uexp.T, d[:,i])
     #    pc =  tensor.dot.mode_dot(core, wid, 1)
     #    expPC[:,i] = tensor.dot.mode_dot(pc, Uexpd, 1)
-    pmax = expPC.max(axis = 0) 
-    pmin = expPC.min(axis = 0)
+    #pmax = expPC.max(axis = 0) 
+    #pmin = expPC.min(axis = 0)
 
-    expPC = (expPC - pmin) / (pmax - pmin)
-    expPC = 1 - expPC
+    #expPC = (expPC - pmin) / (pmax - pmin)
+    expPC = - expPC
     #print(expPC)
     return expPC
     
@@ -221,7 +221,10 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
     core = model['core'][valid_ind, :, :]
     min_E = 1000
     wid = np.random.rand(core.shape[1])
+    #wid = np.loadtxt("wid.out")
+    #wid = np.ones(core.shape[1])
     wexp0 = np.random.rand(core.shape[2])
+    #wexp0 = np.ones(core.shape[2])
     m = len(xl)
     wexpl = [wexp0] * m
  
@@ -229,7 +232,7 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
         fe = 0
         sl = []
         Rl = []
-        tl = []
+        t3dl = []
         wid_j = np.zeros(core.shape[1])
         #Ml = []
         #Ql = []
@@ -246,15 +249,15 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
 
 
             P = mesh.transform.estimate_affine_matrix_3d22d(X.T, x.T)
-            s, R, t = mesh.transform.P2sRt(P)
+            s, R, t3d = mesh.transform.P2sRt(P)
             sl.append(s)
             Rl.append(R)
-            tl.append(t[:2])
+            t3dl.append(t3d)
             #----- estimate wid & wexp
             # shape wid
             #shapePC = tensor.dot.mode_dot(core, wexpl[j].T ,2)
             
-            bnds_id = ((0,1),) * core.shape[1]
+            bnds_id = ((-1,1),) * core.shape[1]
             args = (  # a_star, M, Q, x, X
                 x,
                 core,
@@ -263,7 +266,7 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
                 #posit_M
                 s,
                 R,
-                t[:2]
+                t3d[:2]
             )
             # use L-BFGS-B algo to get wid
             res = bfgs(fitting_error_wid, wid, args=args, bounds=bnds_id, options={
@@ -281,7 +284,7 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
             #print("2expPC shape", expPC.shape) 
             
             
-            bnds_exp = ((0,1),) * core.shape[2]
+            bnds_exp = ((-1,1),) * core.shape[2]
             args = (  # a_star, M, Q, x, X
                 x,
                 core,
@@ -290,7 +293,7 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
                 #posit_M
                 s,
                 R,
-                t[:2]
+                t3d[:2]
             )
             res = bfgs(fitting_error_wexp, wexpl[j], args=args, bounds=bnds_exp, options={
                 'disp': False, 'maxcor': 10, 'ftol': 2.220446049250313e-09, 'gtol': 1e-05, 'eps': 1e-08, 'maxfun': 15000,
@@ -300,7 +303,7 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
             print("image {} single exp error:".format(j), res.fun) 
             
  
-        bnds_id = ((0,1),) * core.shape[1]
+        bnds_id = ((-1,1),) * core.shape[1]
         wid = wid_j / m
         args = (  # a_star, M, Q, x, X
             xl,
@@ -310,7 +313,7 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
             #Ml
             sl,
             Rl,
-            tl
+            t3dl
         )
         res = bfgs(fitting_error_overall, wid, args=args, bounds=bnds_id, options={
             'disp': False, 'maxcor': 10, 'ftol': 2.220446049250313e-09, 'gtol': 1e-05, 'eps': 1e-08, 'maxfun': 15000,
@@ -318,14 +321,39 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
         })
         wid = res.x.reshape((-1))
         print("iter " + str(i+1) + " done. E= ", res.fun)
-        if (res.fun < min_E):
-            min_E = res.fun
-            min_id = wid
-            #min_exp = wexp
-            min_iter = i
-            #min_M = posit_M
-            #min_Q = Q
-        np.savetxt("wid.out", wid)
-    return wid
+    return wid, wexpl, sl, Rl, t3dl
 
 
+def show_fitting_result( X_ind,  model, sl, Rl, t3dl, wid, wexpl):
+    
+    
+    X_ind_all = np.tile(X_ind[np.newaxis, :], [3, 1]) * 3
+    X_ind_all[1, :] += 1
+    X_ind_all[2, :] += 2
+    valid_ind = X_ind_all.flatten('F')
+
+
+    core = model['core'][valid_ind, :, :]
+    n = X_ind.shape[0]
+    m = len(sl)
+    Xs = []
+    for i in range(m):
+        X = tensor.dot.mode_dot(core, wexpl[i].T , 2)
+        X = tensor.dot.mode_dot(X, wid.T, 1)
+        X = np.reshape(X, [int(X.shape[0] / 3), 3]).T # 3 x n
+    
+        t2d = np.array(t3dl[i][:2])
+        P = np.array([[1, 0, 0], [0, 1, 0]], dtype = np.float32)
+        A = sl[i]*P.dot(Rl[i])
+    
+        X = A.dot(X)
+        X = X + np.tile(t2d[:, np.newaxis], [1, n]) # 2 x n
+         
+        X = X.T
+        Xs.append(X)
+    return Xs
+
+def generate_mesh(core, wid, wexp):
+    X = tensor.dot.mode_dot(core, wexp.T , 2)
+    X = tensor.dot.mode_dot(X, wid.T, 1)
+    return X 

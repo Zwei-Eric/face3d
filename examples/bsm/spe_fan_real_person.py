@@ -18,6 +18,7 @@ from face3d import mesh_numpy
 from face3d import objloader
 
 from face3d.morphable_model import MorphabelModel
+import copy
 import dlib
 import timeit
 import cv2
@@ -43,10 +44,13 @@ print("triangles shape", bsm.triangles.shape)
 X_ind = bsm.kpt_ind # index of keypoints in 3DMM. fixed.
 
 
+
+folder = 'zzw_3D/'
+
 # ------ light setup
 print("nver", bsm.nver)
 colors = np.tile([0.8,0.8,0.8],(int(bsm.nver),1))
-light_intens = np.array([[1,1,1]])
+light_intens = np.array([[0.8,1,0.8]])
 light_pos = np.array([[0, 0, 300]])
 
 
@@ -54,102 +58,111 @@ light_pos = np.array([[0, 0, 300]])
 
 
 # --- 2. video setup
-cap = cv2.VideoCapture("../Data/videoplayback.mp4")
-fps = cap.get(cv2.CAP_PROP_FPS)
-w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+#cap = cv2.VideoCapture("../Data/videoplayback.mp4")
+#fps = cap.get(cv2.CAP_PROP_FPS)
+#w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+#fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
 
 #for img in images:
 # for cnt, img in enumerate(images)
 
 imgs = []
 xl = []
-while(cap.isOpened()):
-    ret , frame = cap.read()
-    if not ret:
-        print("input images numbers: ", len(imgs))
-        print("load video overed")
-        break;
-    imgs.append(np.array(frame))
-   
- 
+
+for i in range(60):
+    #path = "../../../facewarehouse_data/Tester_39/TrainingPose/pose_"
+    path = "../Data/exp_input/exp_inpu"
+    path = path + str(i) + ".jpg"
+    img = io.imread(path)
+    imgs.append(img[:,:,:3])
 
 #img = io.imread("../Data/qtest1.jpg")
 #imgs.append(img)
 #img = io.imread("../Data/qtest2.jpg")
 #imgs.append(img)
-
+imgs_c = copy.deepcopy(imgs)
 for idx, img in enumerate(imgs):
-    if idx % 2 != 0:
-        continue
-    img_target = img.copy()[:,:,:3]
-    img_target = cv2.cvtColor(img_target, cv2.COLOR_BGR2RGB)
-    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    h, w= img_gray.shape[:2]
+    h, w= img.shape[:2]
     #faces = detector(img_gray,0)
     #print("img shape", img_target.shape)
     x = np.zeros([68,2])
-    faces = fa.get_landmarks(img_target) 
+    faces = fa.get_landmarks(img) 
     if faces is None:
         print("image {} no face detected".format(idx))
         continue
     elif len(faces) != 0:
         for i in range(len(faces)):
             landmarks = faces[i]
-            for idx, point in enumerate(landmarks):
+            #print("landmarks shape", faces[i].shape)
+          
+            for idkp, point in enumerate(landmarks):
                 # position of 68 key points
                 pos = (int(point[0]), int(point[1]))       # notice the size of w:[0,0] h;[0,1]
-                x[idx] = pos
+                x[idkp] = pos
     
                 rr, cc = draw.circle_perimeter(pos[1], pos[0], 2)
-                draw.set_color(img_target, [rr,cc], [0 ,0, 233])
+                draw.set_color(img, [rr,cc], [233 ,0, 233])
     else:
         print("image {} no face detected".format(idx))
         continue
     x[:,0] = x[:, 0] - w / 2.0
     x[:,1] = h / 2.0 - x[:, 1] - 1
     xl.append(x)
+    #cv2.imwrite("pose39_3D/face_kpt{}.jpg".format(idx), img_target)
 #fit mesh
 print("{} faces detected".format(len(xl)))
-expPC= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3)
+expPC ,wid, wexpl, sl, Rl, tl= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3)
 #print("fitted_info",ret)
 #fitted_vertices = np.float32(bsm.generate_vertices(fitted_sp, fitted_ep))
 #np.savetxt("f_ep", fitted_ep)
 #fitted_vertices = np.reshape(bsm.model['expPC'][:,0], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
 #fitted_vertices += np.reshape(bsm.model['expMU'], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
-#np.savetxt('verices', fitted_vertices)
+#np.savetxt('qz/wid_with_update.out', wid)
+X = bsm.show_fitting_result(X_ind,   sl, Rl, tl,  wid, wexpl)
 
-
-
+X = np.array(X)
+X[:,:,0] = X[:,:, 0] + w / 2.0
+X[:,:,1] = h / 2.0 - X[:,:, 1] - 1
+X = X.astype(np.int32)
 obj = objloader.obj.objloader('pose_0.obj')
-
 for i in range(47):
     vert = expPC[:,i]
     obj.vertices = vert
-    obj.save('fat/exp_{}.obj'.format(i))
+    obj.save('zzw_3D/exp_{}.obj'.format(i))
 
-#
-#
-#
-#transformed_vertices = bsm.transform(fitted_vertices, fitted_s, fitted_angles, fitted_t)
-#lit_colors = mesh.light.add_light(transformed_vertices, bsm.triangles, colors, light_pos, light_intens)
-#image_vertices = mesh.transform.to_image(transformed_vertices, h, w)
-#
-#
-#
-#
-#
-##verify fitted parameters
-#
-#fitted_image = mesh.render.render_colors(image_vertices, bsm.triangles, lit_colors, h, w)
-#fitted_image = np.minimum(np.maximum(fitted_image, -1), 1)
-#fitted_image = (fitted_image * 255.0).astype('u1')        
-#img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-#fitted_image = cv2.cvtColor(fitted_image, cv2.COLOR_RGB2BGR)
-#out_img = fitted_image
-#
-#cv2.imwrite("kpt_face.jpg", img_target)
-#cv2.imwrite("fit_mesh.jpg", out_img)
-## io.imsave('fit.jpg', fitted_image)
-#
+
+for idx, img in enumerate(imgs):
+    for pos in X[idx]:
+        rr, cc = draw.circle_perimeter(pos[1], pos[0], 2)
+        draw.set_color(img, [rr,cc], [0 ,233, 0])
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    path = folder + "fitted_keypoint" + str(idx) + ".jpg"
+    cv2.imwrite(path, img)
+    path = folder + "fitted_mesh" + str(idx) + ".obj"
+    vert = bsm.generate_fitting_mesh(wid, wexpl[idx])
+    obj.vertices = vert
+    obj.save(path)
+    
+    vert = np.reshape(vert, [int(3), int(len(vert)/ 3)], 'F').T 
+    trans_vert = bsm.similarity_transform(vert, sl[idx], Rl[idx], tl[idx])
+    lit_colors = mesh.light.add_light(trans_vert, bsm.triangles, colors, light_pos, light_intens)
+    image_vertices = mesh.transform.to_image(trans_vert, h, w)
+
+    fitted_image = mesh.render.render_colors(image_vertices, bsm.triangles, lit_colors, h, w)
+    fitted_image = np.minimum(np.maximum(fitted_image, -1) , 1)    
+    fitted_image = (fitted_image * 255.0).astype('u1')
+    mesh_img = cv2.addWeighted(fitted_image, 2.5, cv2.cvtColor(imgs_c[idx], cv2.COLOR_RGB2BGR), 1, 0)
+    path = folder + "fitted_image" + str(idx) + ".jpg"
+    cv2.imwrite(path, mesh_img)
+
+
+
+
+
+
+np.savetxt("wid.out", wid)
+
+
+
+

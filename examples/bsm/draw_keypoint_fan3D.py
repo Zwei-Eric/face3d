@@ -54,26 +54,23 @@ light_pos = np.array([[0, 0, 300]])
 
 
 # --- 2. video setup
-cap = cv2.VideoCapture("../Data/videoplayback.mp4")
-fps = cap.get(cv2.CAP_PROP_FPS)
-w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+#cap = cv2.VideoCapture("../Data/videoplayback.mp4")
+#fps = cap.get(cv2.CAP_PROP_FPS)
+#w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+#fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
 
 #for img in images:
 # for cnt, img in enumerate(images)
 
 imgs = []
 xl = []
-while(cap.isOpened()):
-    ret , frame = cap.read()
-    if not ret:
-        print("input images numbers: ", len(imgs))
-        print("load video overed")
-        break;
-    imgs.append(np.array(frame))
-   
- 
+
+for i in range(20):
+    path = "../../../facewarehouse_data/Tester_39/TrainingPose/pose_"
+    path = path + str(i) + ".png"
+    img = io.imread(path)
+    imgs.append(img)
 
 #img = io.imread("../Data/qtest1.jpg")
 #imgs.append(img)
@@ -81,8 +78,6 @@ while(cap.isOpened()):
 #imgs.append(img)
 
 for idx, img in enumerate(imgs):
-    if idx % 2 != 0:
-        continue
     img_target = img.copy()[:,:,:3]
     img_target = cv2.cvtColor(img_target, cv2.COLOR_BGR2RGB)
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -97,10 +92,12 @@ for idx, img in enumerate(imgs):
     elif len(faces) != 0:
         for i in range(len(faces)):
             landmarks = faces[i]
-            for idx, point in enumerate(landmarks):
+            #print("landmarks shape", faces[i].shape)
+          
+            for idkp, point in enumerate(landmarks):
                 # position of 68 key points
                 pos = (int(point[0]), int(point[1]))       # notice the size of w:[0,0] h;[0,1]
-                x[idx] = pos
+                x[idkp] = pos
     
                 rr, cc = draw.circle_perimeter(pos[1], pos[0], 2)
                 draw.set_color(img_target, [rr,cc], [0 ,0, 233])
@@ -110,24 +107,26 @@ for idx, img in enumerate(imgs):
     x[:,0] = x[:, 0] - w / 2.0
     x[:,1] = h / 2.0 - x[:, 1] - 1
     xl.append(x)
+    print("idx", idx)
+    #img_target = cv2.cvtColor(img_target, cv2.COLOR_RGB2BGR)
+    cv2.imwrite("pose39/kpt_face_{}.jpg".format(idx), img_target)
 #fit mesh
 print("{} faces detected".format(len(xl)))
-expPC= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3)
+#expPC = bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3)
 #print("fitted_info",ret)
 #fitted_vertices = np.float32(bsm.generate_vertices(fitted_sp, fitted_ep))
 #np.savetxt("f_ep", fitted_ep)
 #fitted_vertices = np.reshape(bsm.model['expPC'][:,0], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
 #fitted_vertices += np.reshape(bsm.model['expMU'], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
-#np.savetxt('verices', fitted_vertices)
+#np.savetxt('qz/wid_with_update.out', wid)
 
 
+#obj = objloader.obj.objloader('pose_0.obj')
 
-obj = objloader.obj.objloader('pose_0.obj')
-
-for i in range(47):
-    vert = expPC[:,i]
-    obj.vertices = vert
-    obj.save('fat/exp_{}.obj'.format(i))
+#for i in range(47):
+#    vert = expPC[:,i]
+#    obj.vertices = vert
+#    obj.save('zzw/exp_{}.obj'.format(i))
 
 #
 #
