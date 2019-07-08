@@ -35,7 +35,7 @@ def fitting_error_overall(wid, xl, core, wexpl, sl, Rl, t3dl):
         X = A.dot(X)
         X = X + np.tile(t2d[:, np.newaxis], [1, n]) # 2 x n
     
-        fe += np.linalg.norm(X - x) ** 2 
+        fe += (np.linalg.norm(X - x) ** 2)
     
         #X = np.r_[X, np.ones([1, n])]
     
@@ -79,7 +79,7 @@ def fitting_error_wid(wid, x, core, wexp, s, R, t2d):
     
     X = A.dot(X)
     X = X + np.tile(t2d[:, np.newaxis], [1, n]) # 2 x n
-    fe = np.linalg.norm(X - x) ** 2
+    fe = np.linalg.norm(X - x) ** 2 
     
     #fe = np.linalg.norm(X - x) 
     
@@ -122,7 +122,6 @@ def fitting_error_wexp(wexp, x, core, wid,  s, R, t2d):
     X = X + np.tile(t2d[:, np.newaxis], [1, n]) # 2 x n
     fe = np.linalg.norm(X - x) ** 2
     #X = np.r_[X, np.ones([1, n])]
-    
 
     #X = M.dot(X)
     #w = X[2,:]

@@ -206,16 +206,19 @@ def estimate_expression_bsm(x, shapeMU, expPC, expEV, s, R, t2d, lamb = 2000):
     
     return exp_para
 
-def fit_exp(x, core, wid, max_iter):
-    wexp = np.random.rand(core.shape[2])
-    
+def fit_exp(x, core, wid, ini_exp, max_iter):
+    wexp = ini_exp  + np.random.rand(core.shape[2]) * 0.1 - 0.05
+    #wexp = np.random.rand(core.shape[2])
     X = tensor.dot.mode_dot(core, wexp.T, 2)
     X = tensor.dot.mode_dot(X, wid.T, 1)
     X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
     x = x.T
+    n = x.shape[1]
+    fe = 99999
+    i = 0
+    #for i in range(max_iter):
+    while fe > 0.5 and i <  max_iter:
 
-        
-    for i in range(max_iter):
         P = mesh.transform.estimate_affine_matrix_3d22d(X.T, x.T)
         s, R, t3d = mesh.transform.P2sRt(P)
 
@@ -234,7 +237,9 @@ def fit_exp(x, core, wid, max_iter):
         
         })
         wexp = res.x.reshape((-1))
-        print("expression fitting error in iteration {}:".format(i), res.fun)
+        fe = np.sqrt(res.fun) / n
+        print("expression fitting error in iteration {}:".format(i), fe)
+        i = i + 1
     return wexp, s, R, t3d
 
 # ---------------- fit 

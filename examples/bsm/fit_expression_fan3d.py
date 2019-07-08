@@ -75,8 +75,9 @@ path = folder + "wid.out"
 wid =  np.loadtxt(path)
 
 
+path = folder + "result/wexpl.out"
+wexpl = np.loadtxt(path)
 imgs = []
-
 for i in range(60):
     #path = "../../../facewarehouse_data/Tester_39/TrainingPose/pose_"
     path = "../Data/" + folder + "exp_input"
@@ -88,7 +89,6 @@ obj = objloader.obj.objloader('pose_0.obj')
 imgs_c = copy.deepcopy(imgs)
 for idx, img in enumerate(imgs):
     h, w= img.shape[:2]
-    print("image size", h,w)
     #faces = detector(img_gray,0)
     #print("img shape", img_target.shape)
     x = np.zeros([68,2])
@@ -111,11 +111,12 @@ for idx, img in enumerate(imgs):
     else:
         print("image {} no face detected".format(idx))
         continue
+    print("image: ", idx)
     x[:,0] = x[:, 0] - w / 2.0
     x[:,1] = h / 2.0 - x[:, 1] - 1
     
-    X, wexp, s, R, t3d = bsm.fit_expression(x, X_ind, wid, max_iter = 3)
-    
+    X, wexp, s, R, t3d = bsm.fit_expression(x, X_ind, wid, wexpl[idx], max_iter = 3)
+    wexpl[idx] = wexp
     X = np.array(X)
     X[:,0] = X[:, 0] + w / 2.0
     X[:,1] = h / 2.0 - X[:, 1] - 1
@@ -168,6 +169,9 @@ for idx, img in enumerate(imgs):
 
 
 
+wexpl = np.asarray(wexpl)
+path = folder + "result/wexpl.out"
+np.savetxt(path, wexpl)
 
 
 

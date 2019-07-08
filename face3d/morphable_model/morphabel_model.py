@@ -198,10 +198,10 @@ class  MorphabelModel(object):
             angles = mesh.transform.matrix2angle(R)
             return fitted_ep, s, angles, t
 
-    def fit_expression(self, x, X_ind, wid, max_iter = 4):
+    def fit_expression(self, x, X_ind, wid, ini_wexp, max_iter = 4):
         valid_ind = self.get_valid_ind(X_ind)
         core = self.model['core'][valid_ind, :, :]
-        wexp , s, R, t3d = fit.fit_exp(x,  core, wid, max_iter = max_iter)
+        wexp , s, R, t3d = fit.fit_exp(x,  core, wid, ini_wexp, max_iter = max_iter)
         n = X_ind.shape[0]
         X = blendshapes.show_fitting_result(core, s, R, t3d, wid, wexp, n)
         return X, wexp, s, R, t3d
