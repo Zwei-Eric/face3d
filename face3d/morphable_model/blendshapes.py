@@ -414,6 +414,6 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
             #print("1: single image {} error after change ind".format(j), fe)
             #fe = np.linalg.norm(xl[j][:k] - y) ** 2
             #print("2: single image {} error after change ind".format(j), fe)
-    return wid ,ys
+    return wid ,wexpl, sl, Rl, tl
 
 

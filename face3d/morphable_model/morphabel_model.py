@@ -133,10 +133,10 @@ class  MorphabelModel(object):
     
     def fit_specific_blendshapes(self, xl, X_ind, max_iter):
         #wid = blendshapes.fit_specific_id_param(xl, X_ind, self.model, max_iter = max_iter)
-        wid,  ys = blendshapes.fit_id_param_bfgs(xl, X_ind, self.model, max_iter = max_iter)
+        wid,  wexpl, sl, Rl, tl  = blendshapes.fit_id_param_bfgs(xl, X_ind, self.model, max_iter = max_iter)
         #wid = np.loadtxt("wid.out")
         expPC = blendshapes.fit_blendshapes(self.model, wid, self.nver)
-        return expPC, wid, ys
+        return expPC, wid, wexpl, sl, Rl, tl
 
     
     # --------------------------------------------------- fitting
