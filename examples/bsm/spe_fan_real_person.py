@@ -132,7 +132,8 @@ obj = objloader.obj.objloader('pose_0.obj')
 for i in range(47):
     vert = expPC[:,i]
     obj.vertices = vert
-    obj.save('xd_3D/exp_{}.obj'.format(i))
+    path = folder + "exp_" + str(i) + ".obj"
+    obj.save(path)
 
 
 for idx, img in enumerate(imgs):
