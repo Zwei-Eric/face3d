@@ -142,10 +142,29 @@ class  MorphabelModel(object):
         expPC = blendshapes.generate_blendshapes(self.model, wid, self.nver)
         return expPC, wid, wexpl , sl , Rl, tl
     
-    def show_fitting_result(self, X_ind, sl, Rl, tl ,wid, wexpl):
-        imgs = blendshapes.show_fitting_result(X_ind, self.model, sl, Rl, tl ,wid, wexpl)
+    def get_valid_ind(self, X_ind):
+        X_ind_all = np.tile(X_ind[np.newaxis, :], [3, 1]) * 3
+        X_ind_all[1, :] += 1
+        X_ind_all[2, :] += 2
+        valid_ind = X_ind_all.flatten('F')
+        return valid_ind
+        
+    def show_fitting_result(self, X_ind, sl, Rl, t3dl ,wid, wexpl):
+        '''
+        get positions of keypoints
+        '''
+        valid_ind = self.get_valid_ind(X_ind)
+        core = self.model['core'][valid_ind, :, :]
+        n = X_ind.shape[0]
+        m = len(sl)
+        imgs = []
+        for i in range(m):
+            img = blendshapes.show_fitting_result(core, sl[i], Rl[i], t3dl[i] ,wid, wexpl[i], n)
+            imgs.append(img)
         return imgs
- 
+        
+
+
     def generate_fitting_mesh(self, wid, wexp):
         core = self.model['core']
         return blendshapes.generate_mesh(core, wid, wexp )
@@ -178,6 +197,15 @@ class  MorphabelModel(object):
             fitted_ep, s, R, t = fit.fit_points_BSM(x, X_ind, self.model, n_ep = self.n_exp_para, max_iter = max_iter)
             angles = mesh.transform.matrix2angle(R)
             return fitted_ep, s, angles, t
+
+    def fit_expression(self, x, X_ind, wid, max_iter = 4):
+        valid_ind = self.get_valid_ind(X_ind)
+        core = self.model['core'][valid_ind, :, :]
+        wexp , s, R, t3d = fit.fit_exp(x,  core, wid, max_iter = max_iter)
+        n = X_ind.shape[0]
+        X = blendshapes.show_fitting_result(core, s, R, t3d, wid, wexp, n)
+        return X, wexp, s, R, t3d
+
 
     def fit_color(self, x_colors, X_ind):
         '''

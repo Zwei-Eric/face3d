@@ -202,6 +202,7 @@ def generate_blendshapes(model, wid, n_ver):
     return expPC
     
 
+
 def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
     '''
     Args:
@@ -324,34 +325,33 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
     return wid, wexpl, sl, Rl, t3dl
 
 
-def show_fitting_result( X_ind,  model, sl, Rl, t3dl, wid, wexpl):
+def show_fitting_result(core, s, R, t3d, wid, wexp, kpoint_num):
     
     
-    X_ind_all = np.tile(X_ind[np.newaxis, :], [3, 1]) * 3
-    X_ind_all[1, :] += 1
-    X_ind_all[2, :] += 2
-    valid_ind = X_ind_all.flatten('F')
+#    X_ind_all = np.tile(X_ind[np.newaxis, :], [3, 1]) * 3
+#    X_ind_all[1, :] += 1
+#    X_ind_all[2, :] += 2
+#    valid_ind = X_ind_all.flatten('F')
+#
+#
+#    core = model['core'][valid_ind, :, :]
+#    n = X_ind.shape[0]
+#    m = len(sl)
+#    Xs = []
+#    for i in range(m):
+    X = tensor.dot.mode_dot(core, wexp.T , 2)
+    X = tensor.dot.mode_dot(X, wid.T, 1)
+    X = np.reshape(X, [int(X.shape[0] / 3), 3]).T # 3 x n
 
+    t2d = np.array(t3d[:2])
+    P = np.array([[1, 0, 0], [0, 1, 0]], dtype = np.float32)
+    A = s*P.dot(R)
 
-    core = model['core'][valid_ind, :, :]
-    n = X_ind.shape[0]
-    m = len(sl)
-    Xs = []
-    for i in range(m):
-        X = tensor.dot.mode_dot(core, wexpl[i].T , 2)
-        X = tensor.dot.mode_dot(X, wid.T, 1)
-        X = np.reshape(X, [int(X.shape[0] / 3), 3]).T # 3 x n
-    
-        t2d = np.array(t3dl[i][:2])
-        P = np.array([[1, 0, 0], [0, 1, 0]], dtype = np.float32)
-        A = sl[i]*P.dot(Rl[i])
-    
-        X = A.dot(X)
-        X = X + np.tile(t2d[:, np.newaxis], [1, n]) # 2 x n
-         
-        X = X.T
-        Xs.append(X)
-    return Xs
+    X = A.dot(X)
+    X = X + np.tile(t2d[:, np.newaxis], [1, kpoint_num]) # 2 x n
+     
+    X = X.T
+    return X
 
 def generate_mesh(core, wid, wexp):
     X = tensor.dot.mode_dot(core, wexp.T , 2)

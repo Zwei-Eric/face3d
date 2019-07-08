@@ -4,6 +4,7 @@ Estimating parameters about vertices: shape para, exp para, pose para(s, R, t)
 import numpy as np
 import cv2
 from scipy.optimize import minimize
+from . import blendshapes
 from .. import tensor
 from .. import mesh
 
@@ -205,6 +206,36 @@ def estimate_expression_bsm(x, shapeMU, expPC, expEV, s, R, t2d, lamb = 2000):
     
     return exp_para
 
+def fit_exp(x, core, wid, max_iter):
+    wexp = np.random.rand(core.shape[2])
+    
+    X = tensor.dot.mode_dot(core, wexp.T, 2)
+    X = tensor.dot.mode_dot(X, wid.T, 1)
+    X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+    x = x.T
+
+        
+    for i in range(max_iter):
+        P = mesh.transform.estimate_affine_matrix_3d22d(X.T, x.T)
+        s, R, t3d = mesh.transform.P2sRt(P)
+
+        bnds_exp = ((0,1),) * core.shape[2]
+        args = (
+            x,
+            core,
+            wid,
+            s,
+            R,
+            t3d[:2]
+        )
+        res = blendshapes.bfgs(blendshapes.fitting_error_wexp, wexp, args = args, bounds= bnds_exp, options = {
+                'disp': False, 'maxcor': 10, 'ftol': 2.220446049250313e-09, 'gtol': 1e-05, 'eps': 1e-08, 'maxfun': 15000,
+                'maxiter': 15000, 'iprint': -1, 'maxls': 20
+        
+        })
+        wexp = res.x.reshape((-1))
+        print("expression fitting error in iteration {}:".format(i), res.fun)
+    return wexp, s, R, t3d
 
 # ---------------- fit 
 def fit_points(x, X_ind, model, n_sp, n_ep, max_iter = 4):

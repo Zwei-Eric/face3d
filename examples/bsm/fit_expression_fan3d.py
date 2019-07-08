@@ -70,8 +70,12 @@ light_pos4 = np.array([[0, -700 , 1000]])
 #for img in images:
 # for cnt, img in enumerate(images)
 
+path = folder + "wid.out"
+
+wid =  np.loadtxt(path)
+
+
 imgs = []
-xl = []
 
 for i in range(60):
     #path = "../../../facewarehouse_data/Tester_39/TrainingPose/pose_"
@@ -80,13 +84,11 @@ for i in range(60):
     img = io.imread(path)
     imgs.append(img[:,:,:3])
 
-#img = io.imread("../Data/qtest1.jpg")
-#imgs.append(img)
-#img = io.imread("../Data/qtest2.jpg")
-#imgs.append(img)
+obj = objloader.obj.objloader('pose_0.obj')
 imgs_c = copy.deepcopy(imgs)
 for idx, img in enumerate(imgs):
     h, w= img.shape[:2]
+    print("image size", h,w)
     #faces = detector(img_gray,0)
     #print("img shape", img_target.shape)
     x = np.zeros([68,2])
@@ -111,52 +113,27 @@ for idx, img in enumerate(imgs):
         continue
     x[:,0] = x[:, 0] - w / 2.0
     x[:,1] = h / 2.0 - x[:, 1] - 1
-    xl.append(x)
-    #cv2.imwrite("pose39_3D/face_kpt{}.jpg".format(idx), img_target)
-#fit mesh
-print("{} faces detected".format(len(xl)))
-expPC ,wid, wexpl, sl, Rl, tl= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3)
-#print("fitted_info",ret)
-#fitted_vertices = np.float32(bsm.generate_vertices(fitted_sp, fitted_ep))
-#np.savetxt("f_ep", fitted_ep)
-#fitted_vertices = np.reshape(bsm.model['expPC'][:,0], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
-#fitted_vertices += np.reshape(bsm.model['expMU'], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
-#np.savetxt('qz/wid_with_update.out', wid)
-X = bsm.show_fitting_result(X_ind, sl, Rl, tl,  wid, wexpl)
-
-X = np.array(X)
-X[:,:,0] = X[:,:, 0] + w / 2.0
-X[:,:,1] = h / 2.0 - X[:,:, 1] - 1
-X = X.astype(np.int32)
-obj = objloader.obj.objloader('pose_0.obj')
-for i in range(47):
-    vert = expPC[:,i]
-    obj.vertices = vert
-    path = folder + "exp_" + str(i) + ".obj"
-    obj.save(path)
-
-
-for idx, img in enumerate(imgs):
-    for pos in X[idx]:
+    
+    X, wexp, s, R, t3d = bsm.fit_expression(x, X_ind, wid, max_iter = 3)
+    
+    X = np.array(X)
+    X[:,0] = X[:, 0] + w / 2.0
+    X[:,1] = h / 2.0 - X[:, 1] - 1
+    X = X.astype(np.int32)
+    for pos in X:
         rr, cc = draw.circle_perimeter(pos[1], pos[0], 2)
         draw.set_color(img, [rr,cc], [0 ,233, 0])
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    path = folder + "fitted_keypoint" + str(idx) + ".jpg"
+    path = folder + "result/fitted_keypoint" + str(idx) + ".jpg"
     cv2.imwrite(path, img)
-    path = folder + "fitted_mesh" + str(idx) + ".obj"
-    vert = bsm.generate_fitting_mesh(wid, wexpl[idx])
+    path = folder + "result/fitted_mesh" + str(idx) + ".obj"
+    vert = bsm.generate_fitting_mesh(wid, wexp)
     
-    # normalize
-    #pmax = vert.max()
-    #pmin = vert.min()
-    #vert = (vert - pmin) / (pmax - pmin)
-    
-    # save mesh to .obj file
     obj.vertices = vert
     obj.save(path)
     
     vert = np.reshape(vert, [int(3), int(len(vert)/ 3)], 'F').T 
-    trans_vert = bsm.similarity_transform(vert, sl[idx], Rl[idx], tl[idx])
+    trans_vert = bsm.similarity_transform(vert, s, R, t3d)
     lit_colors1 = mesh.light.add_light(trans_vert, bsm.triangles, colors, light_pos, light_intens)
     lit_colors2 = mesh.light.add_light(trans_vert, bsm.triangles, colors, light_pos2, light_intens)
     lit_colors3 = mesh.light.add_light(trans_vert, bsm.triangles, colors, light_pos3, light_intens)
@@ -181,21 +158,19 @@ for idx, img in enumerate(imgs):
     img2_fg = cv2.bitwise_and(fitted_image, fitted_image, mask = mask_inv)
 
     mesh_img = cv2.addWeighted(bg_img, 1, img2_fg, 3, 0)
-    path = folder + "mix_fitted_image" + str(idx) + ".jpg"
+    path = folder + "result/mix_fitted_image" + str(idx) + ".jpg"
     cv2.imwrite(path, mesh_img)
     
     
     mesh_img = cv2.add(img1_bg, img2_fg)    
-    path = folder + "fitted_image" + str(idx) + ".jpg"
+    path = folder + "result/fitted_image" + str(idx) + ".jpg"
     cv2.imwrite(path, mesh_img)
 
 
 
 
 
-path = folder + "wid.out"
 
-np.savetxt(path, wid)
 
 
 
