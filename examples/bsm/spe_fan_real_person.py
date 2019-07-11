@@ -197,5 +197,8 @@ path = folder + "wid.out"
 
 np.savetxt(path, wid)
 
+path = folder + "wexpl.out"
+
+np.savetxt(path, wexpl)
 
 

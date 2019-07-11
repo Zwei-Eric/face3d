@@ -73,7 +73,7 @@ def load_BSM(config_path):
     triangles = np.loadtxt(path[2])
     # kpt ind
     kpt_3d = np.loadtxt(path[3])
-    expPC =np.loadtxt(path[4])
+    expPC =np.loadtxt(path[4]).T
     core = np.fromfile(path[5], dtype = float)
     Uexp =  np.loadtxt(path[6])
 
@@ -87,7 +87,7 @@ def load_BSM(config_path):
     model['core'] = core  
     model['tri'] = triangles.copy(order = 'C').astype(np.int32) -1
     model['kpt_ind'] = (np.squeeze(np.copy(kpt_3d[:,1]))).astype(np.int32)
-    model['shapeMU'] = expPC[:,:1].astype(np.float32)
+    model['shapeMU'] = expPC[:,0].astype(np.float32)
     model['expPC'] = (expPC[:, 1:]- expPC[:, :1]).astype(np.float32)
     model['shapePC'] = shapePC.astype(np.float32)
     model['shapeEV'] = shapeEV.reshape(-1,1).astype(np.float32)

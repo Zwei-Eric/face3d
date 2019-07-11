@@ -57,7 +57,41 @@ Inference:
 '''
 
 
+def fitting_error_wexp(wexp, x, meanface, expPC,  s, R, t2d):
+    '''
+    Args:
+        x: (2, n) image points
+        vertices: (3, n) 
+        M: (3, 4) camera external matrix
+        Q: (3, 3) projection matrix
 
+    Returns:
+        fe : fitting error
+
+    '''
+    
+    X = meanface + np.dot(expPC, wexp) 
+    
+    #X = tensor.dot.mode_dot(core, wexp.T , 2)
+    #X = tensor.dot.mode_dot(X, wid.T, 1)
+    #X = tensor.dot.mode_dot(core, wid.T, 1)
+    #X = tensor.dot.mode_dot(X, wexp.T , 1)
+    
+    
+    X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+    n = x.shape[1]
+    
+    t2d = np.array(t2d)
+    P = np.array([[1, 0, 0], [0, 1, 0]], dtype = np.float32)
+    A = s*P.dot(R)
+    
+    X = A.dot(X)
+    X = X + np.tile(t2d[:, np.newaxis], [1, n]) # 2 x n
+    fe = np.linalg.norm(X - x) ** 2
+    
+    
+    return fe
+ 
 
 
 def estimate_shape(x, shapeMU, shapePC, shapeEV, expression, s, R, t2d, lamb = 3000):
@@ -206,41 +240,53 @@ def estimate_expression_bsm(x, shapeMU, expPC, expEV, s, R, t2d, lamb = 2000):
     
     return exp_para
 
-def fit_exp(x, core, wid, ini_exp, max_iter):
-    wexp = ini_exp  + np.random.rand(core.shape[2]) * 0.1 - 0.05
+def fit_exp(x, meanface, expPC, ini_exp, max_iter):
+    wexp = ini_exp[1:] # + np.random.rand(core.shape[2]) * 0.1 - 0.05
     #wexp = np.random.rand(core.shape[2])
-    X = tensor.dot.mode_dot(core, wexp.T, 2)
-    X = tensor.dot.mode_dot(X, wid.T, 1)
-    X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+    #X = tensor.dot.mode_dot(core, wexp.T, 2)
+    #X = tensor.dot.mode_dot(X, wid.T, 1)
+    #X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+    
+    #X  = np.dot(expPC, wexp)
+    #X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+    
+
     x = x.T
     n = x.shape[1]
     fe = 99999
+    def_error = fe
     i = 0
     #for i in range(max_iter):
-    while fe > 0.5 and i <  max_iter:
+    while def_error > 0.0001 and i <  max_iter:
+        #print("meanface shape", meanface.shape )
+        #print("expPC shape", expPC.shape)
+        X  = meanface + np.dot(expPC, wexp)
+        #print("X shape", X.shape)
+        X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
 
         P = mesh.transform.estimate_affine_matrix_3d22d(X.T, x.T)
         s, R, t3d = mesh.transform.P2sRt(P)
 
-        bnds_exp = ((0,1),) * core.shape[2]
+        bnds_exp = ((0,1),) * expPC.shape[1]
         args = (
             x,
-            core,
-            wid,
+            meanface,
+            expPC,
             s,
             R,
             t3d[:2]
         )
-        res = blendshapes.bfgs(blendshapes.fitting_error_wexp, wexp, args = args, bounds= bnds_exp, options = {
+        res = blendshapes.bfgs(fitting_error_wexp, wexp, args = args, bounds= bnds_exp, options = {
                 'disp': False, 'maxcor': 10, 'ftol': 2.220446049250313e-09, 'gtol': 1e-05, 'eps': 1e-08, 'maxfun': 15000,
                 'maxiter': 15000, 'iprint': -1, 'maxls': 20
         
         })
         wexp = res.x.reshape((-1))
-        fe = np.sqrt(res.fun) / n
+        def_error = np.abs(fe - np.sqrt(res.fun) / n)
+        fe = np.sqrt(res.fun) / n 
         print("expression fitting error in iteration {}:".format(i), fe)
         i = i + 1
-    return wexp, s, R, t3d
+    return wexp, s, R, t3d, fe
 
 # ---------------- fit 
 def fit_points(x, X_ind, model, n_sp, n_ep, max_iter = 4):

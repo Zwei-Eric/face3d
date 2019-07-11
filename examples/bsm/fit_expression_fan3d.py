@@ -44,8 +44,11 @@ print("triangles shape", bsm.triangles.shape)
 X_ind = bsm.kpt_ind # index of keypoints in 3DMM. fixed.
 
 
+kp_mask = np.ones(len(X_ind), dtype = bool)
+kp_mask[17:27] = False
+X_ind = X_ind[kp_mask]
 
-folder = 'xd_3D/'
+folder = 'qz_3D/'
 
 # ------ light setup
 print("nver", bsm.nver)
@@ -69,10 +72,8 @@ light_pos4 = np.array([[0, -700 , 1000]])
 
 #for img in images:
 # for cnt, img in enumerate(images)
+fes = []
 
-path = folder + "wid.out"
-
-wid =  np.loadtxt(path)
 
 
 path = folder + "result/wexpl.out"
@@ -114,9 +115,10 @@ for idx, img in enumerate(imgs):
     print("image: ", idx)
     x[:,0] = x[:, 0] - w / 2.0
     x[:,1] = h / 2.0 - x[:, 1] - 1
-    
-    X, wexp, s, R, t3d = bsm.fit_expression(x, X_ind, wid, wexpl[idx], max_iter = 3)
-    wexpl[idx] = wexp
+    x = x[kp_mask]
+    X, wexp, s, R, t3d,fe = bsm.fit_expression(x, X_ind,  wexpl[idx], max_iter = 30)
+    wexpl[idx][1:] = wexp
+    fes.append(fe)
     X = np.array(X)
     X[:,0] = X[:, 0] + w / 2.0
     X[:,1] = h / 2.0 - X[:, 1] - 1
@@ -128,7 +130,7 @@ for idx, img in enumerate(imgs):
     path = folder + "result/fitted_keypoint" + str(idx) + ".jpg"
     cv2.imwrite(path, img)
     path = folder + "result/fitted_mesh" + str(idx) + ".obj"
-    vert = bsm.generate_fitting_mesh(wid, wexp)
+    vert = bsm.generate_fitting_mesh(wexp)
     
     obj.vertices = vert
     obj.save(path)
@@ -168,7 +170,9 @@ for idx, img in enumerate(imgs):
     cv2.imwrite(path, mesh_img)
 
 
-
+fes = np.array(fes)
+path = folder + "result/fes.out"
+np.savetxt(path, fes)
 wexpl = np.asarray(wexpl)
 path = folder + "result/wexpl.out"
 np.savetxt(path, wexpl)

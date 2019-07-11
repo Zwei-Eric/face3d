@@ -165,9 +165,11 @@ class  MorphabelModel(object):
         
 
 
-    def generate_fitting_mesh(self, wid, wexp):
-        core = self.model['core']
-        return blendshapes.generate_mesh(core, wid, wexp )
+    def generate_fitting_mesh(self,  wexp):
+        meanface = self.model['shapeMU']
+        expPC = self.model['expPC']
+        mesh = meanface + np.dot(expPC, wexp)
+        return mesh 
 
 
     # --------------------------------------------------- fitting
@@ -198,13 +200,23 @@ class  MorphabelModel(object):
             angles = mesh.transform.matrix2angle(R)
             return fitted_ep, s, angles, t
 
-    def fit_expression(self, x, X_ind, wid, ini_wexp, max_iter = 4):
+    def fit_expression(self, x, X_ind, ini_wexp,  max_iter = 4):
         valid_ind = self.get_valid_ind(X_ind)
-        core = self.model['core'][valid_ind, :, :]
-        wexp , s, R, t3d = fit.fit_exp(x,  core, wid, ini_wexp, max_iter = max_iter)
+        #core = self.model['core'][valid_ind, :, :]
+        meanface = self.model['shapeMU'][valid_ind]
+        expPC = self.model['expPC'][valid_ind,:]
+        wexp , s, R, t3d, fe = fit.fit_exp(x, meanface, expPC,ini_wexp, max_iter = max_iter)
         n = X_ind.shape[0]
-        X = blendshapes.show_fitting_result(core, s, R, t3d, wid, wexp, n)
-        return X, wexp, s, R, t3d
+        X = meanface + np.dot(expPC, wexp)
+        X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+        t2d = np.array(t3d[:2])
+        P = np.array([[1,0,0] , [0, 1, 0]], dtype = np.float32)
+        A = s* P.dot(R)
+
+        X = A.dot(X)
+        X = X + np.tile(t2d[:, np.newaxis], [1, n])
+        print(X.shape)
+        return X.T, wexp, s, R, t3d, fe
 
 
     def fit_color(self, x_colors, X_ind):
