@@ -21,16 +21,20 @@ from face3d.morphable_model import MorphabelModel
 import dlib
 import timeit
 import cv2
-
+import face_alignment
 
 # --------------------- Forward: parameters(shape, expression, pose) --> 3D obj --> 2D image  ---------------
 # --- 1. load model
 bsm = MorphabelModel('../Data/BSM/config', model_type = 'BSM')
 print('init bsm model success')
-detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor('../Data/dlib/shape_predictor_68_face_landmarks.dat')
-print(bsm.model['shapePC'].shape)
-print("triangles shape", bsm.triangles.shape)
+#detector = dlib.get_frontal_face_detector()
+#predictor = dlib.shape_predictor('../Data/dlib/shape_predictor_68_face_landmarks.dat')
+#print(bsm.model['shapePC'].shape)
+#print("triangles shape", bsm.triangles.shape)
+
+
+fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D,  device = 'cuda', flip_input = False)
+
 # -------------------- Back:  2D image points and corresponding 3D vertex indices-->  parameters(pose, shape, expression) ------
 ## only use 68 key points to fit
 
@@ -48,39 +52,36 @@ light_pos = np.array([[0, 0, 300]])
 # for cnt, img in enumerate(images)
 
 
-img = io.imread("../Data/zwtest.jpg")
+img = io.imread("../Data/pose39e0.png")
 img_target = img.copy()[:,:,:3]
 img_target = cv2.cvtColor(img_target, cv2.COLOR_BGR2RGB)
 img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 h, w= img_gray.shape[:2]
-faces = detector(img_gray,0)
 print("img shape", img_target.shape)
 x = np.zeros([68,2])
-
-if len(faces) != 0:
+faces = fa.get_landmarks(img_target)
+if faces is None:
+    print("image no face detected")
+    exit()
+elif len(faces) != 0:
     for i in range(len(faces)):
-        landmarks = np.matrix([[p.x, p.y] for p in predictor(img_gray, faces[i]).parts()])
+        landmarks = faces[i]
         for idx, point in enumerate(landmarks):
-            # position of 68 key points
-            pos = (point[0,0], point[0,1])          # notice the size of w:[0,0] h;[0,1]
+            pos = (int(point[0]), int(point[1]))
             x[idx] = pos
-
             rr, cc = draw.circle_perimeter(pos[1], pos[0], 2)
             draw.set_color(img_target, [rr,cc], [0 ,0, 233])
-else:
-    print("no face detected")
-    exit()
 x[:,0] = x[:, 0] - w / 2.0
 x[:,1] = h / 2.0 - x[:, 1] - 1
 
 #fit mesh
 
-fitted_ep, fitted_s, fitted_angles, fitted_t = bsm.fit(x, X_ind, max_iter = 10, model_type = 'BSM')
+fitted_ep, fitted_s, fitted_angles, fitted_t = bsm.fit(x, X_ind,  max_iter = 10, model_type = 'BSM')
 print("fitted_s",fitted_s)
 print("fitted_angles", fitted_angles)
 print("fitted_t", fitted_t[:2])
 fitted_vertices = np.float32(bsm.generate_vertices_bsm(fitted_ep))
-np.savetxt("f_ep", fitted_ep)
+#np.savetxt("f_ep", fitted_ep)
 #fitted_vertices = np.reshape(bsm.model['expPC'][:,0], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
 #fitted_vertices += np.reshape(bsm.model['expMU'], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
 #np.savetxt('verices', fitted_vertices)
@@ -113,7 +114,7 @@ img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 fitted_image = cv2.cvtColor(fitted_image, cv2.COLOR_RGB2BGR)
 out_img = fitted_image
 
-cv2.imwrite("kpt_face.jpg", img_target)
+cv2.imwrite("kpt_face1.jpg", img_target)
 cv2.imwrite("fit_mesh.jpg", out_img)
 # io.imsave('fit.jpg', fitted_image)
 

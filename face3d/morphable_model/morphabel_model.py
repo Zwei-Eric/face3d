@@ -36,9 +36,9 @@ class  MorphabelModel(object):
             self.full_triangles = np.vstack((self.model['tri'], self.model['tri_mouth']))
         elif model_type == 'BSM':
             self.model = load.load_BSM(model_path)
-            self.nver = self.model['expPC'].shape[0]/3
-            self.n_shape_para = self.model['shapePC'].shape[1]
-            self.n_exp_para = self.model['expPC'].shape[1]
+            self.nver = self.model['core'].shape[0]/3
+            self.n_shape_para = self.model['core'].shape[1]
+            self.n_exp_para = self.model['core'].shape[2]
             #self.nver = self.model['core'].shape[0]
             #self.n_shape_para = self.model['core'].shape[1]
             #self.n_exp_para = self.model['core'].shape[2]
@@ -65,7 +65,7 @@ class  MorphabelModel(object):
         if type == 'zero':
             ep = np.zeros((self.n_exp_para, 1))
         elif type == 'random':
-            ep = -1.5 + 3*np.random.random([self.n_exp_para, 1])
+            ep = -1.5 + 3 * np.random.random([self.n_exp_para, 1])
             ep[6:, 0] = 0
 
         return ep 
@@ -84,7 +84,7 @@ class  MorphabelModel(object):
         return vertices
 
     def generate_vertices_bsm(self, exp_para):
-        vertices = self.model['shapeMU']  + self.model['expPC'].dot(exp_para)
+        vertices = self.model['expPC'].dot(exp_para)
         vertices = np.reshape(vertices, [int(3), int(len(vertices)/3)], 'F').T
         return vertices 
 
@@ -135,12 +135,50 @@ class  MorphabelModel(object):
         R = mesh.transform.angle2matrix_3ddfa(angles)
         return mesh.transform.similarity_transform(vertices, s, R, t3d)
     
-    def fit_specific_blendshapes(self, xl, X_ind, max_iter):
+    def similarity_transform(self, vertices, s, R, t3d):
+        return mesh.transform.similarity_transform(vertices, s, R, t3d)
+    
+    def fit_specific_blendshapes(self, xl, X_ind, max_iter, kp_type = '3D'):
         #wid = blendshapes.fit_specific_id_param(xl, X_ind, self.model, max_iter = max_iter)
-        wid , wexpl, sl, Rl, tl= blendshapes.fit_id_param_bfgs(xl, X_ind, self.model, max_iter = max_iter)
-        #wid = np.loadtxt("wid.out")
-        expPC = blendshapes.generate_blendshapes(self.model, wid, self.nver)
-        return expPC, wid, wexpl , sl , Rl, tl
+
+        if kp_type == '3D':
+            wid , wexpl, sl, Rl, tl= blendshapes.fit_id_param_bfgs(xl, X_ind, self.model, max_iter = max_iter)
+            expPC = blendshapes.generate_blendshapes(self.model, wid, self.nver)
+            return expPC, wid, wexpl, sl, Rl, tl
+        elif kp_type == '2D':
+            wid,  wexpl, sl, Rl, tl, new_X_ind  = blendshapes.fit_id_param_bfgs(xl, X_ind, self.model, max_iter = max_iter, kp_type = '2D')
+            expPC = blendshapes.generate_blendshapes(self.model, wid, self.nver)
+            return expPC, wid, wexpl, sl, Rl, tl, new_X_ind
+        else:
+            print('unknown keypoint type')
+
+    def show_fitting_result(self, X_ind, s, R, t3d, wid, wexp):
+        '''
+        get positions of keypoints
+        '''
+        valid_ind = self.get_valid_ind(X_ind)
+        core = self.model['core'][valid_ind, :, :]
+        n = X_ind.shape[0]
+        img = blendshapes.show_fitting_result(core, s, R, t3d ,wid, wexp, n)
+        return img
+
+    def generate_expression_mesh(self,  wexp, mask = []):
+        
+        mask = np.asarray(mask)
+        meanface = self.model['shapeMU']
+        expPC = self.model['expPC']
+        print("meanface expPC shape", meanface.shape, expPC.shape)
+        if mask.shape[0] == 0:
+            mesh = meanface + np.dot(expPC, wexp[:, np.newaxis])
+        else: 
+            mesh = meanface[mask] + np.dot(expPC[mask,:], wexp[:, np.newaxis])
+        return mesh 
+
+
+    def generate_bilinear_mesh(self, wid, wexp):
+        core = self.model['core']
+        return blendshapes.generate_bilinear_mesh(core, wid, wexp)
+
     
     def get_valid_ind(self, X_ind):
         X_ind_all = np.tile(X_ind[np.newaxis, :], [3, 1]) * 3
@@ -149,31 +187,9 @@ class  MorphabelModel(object):
         valid_ind = X_ind_all.flatten('F')
         return valid_ind
         
-    def show_fitting_result(self, X_ind, sl, Rl, t3dl ,wid, wexpl):
-        '''
-        get positions of keypoints
-        '''
-        valid_ind = self.get_valid_ind(X_ind)
-        core = self.model['core'][valid_ind, :, :]
-        n = X_ind.shape[0]
-        m = len(sl)
-        imgs = []
-        for i in range(m):
-            img = blendshapes.show_fitting_result(core, sl[i], Rl[i], t3dl[i] ,wid, wexpl[i], n)
-            imgs.append(img)
-        return imgs
-        
-
-
-    def generate_fitting_mesh(self,  wexp):
-        meanface = self.model['shapeMU']
-        expPC = self.model['expPC']
-        mesh = meanface + np.dot(expPC, wexp)
-        return mesh 
-
 
     # --------------------------------------------------- fitting
-    def fit(self, x, X_ind, max_iter = 4, isShow = False, model_type = 'BFM'):
+    def fit(self, x, X_ind, max_iter = 4, isShow = False, model_type = 'BFM', method = 'default'):
         ''' fit 3dmm & pose parameters
         Args:
             x: (n, 2) image points
@@ -196,7 +212,10 @@ class  MorphabelModel(object):
                 angles = mesh.transform.matrix2angle(R)
             return fitted_sp, fitted_ep, s, angles, t
         elif model_type == 'BSM':
-            fitted_ep, s, R, t = fit.fit_points_BSM(x, X_ind, self.model, n_ep = self.n_exp_para, max_iter = max_iter)
+            if method == 'bfgs':
+                fitted_ep, s, R, t = fit.fit_exp_bfgs(x, X_ind, self.model, n_ep = self.n_exp_para, max_iter = max_iter)
+            else:
+                fitted_ep, s, R, t = fit.fit_points_BSM(x, X_ind, self.model, n_ep = self.n_exp_para, max_iter = max_iter)
             angles = mesh.transform.matrix2angle(R)
             return fitted_ep, s, angles, t
 
@@ -207,7 +226,7 @@ class  MorphabelModel(object):
         expPC = self.model['expPC'][valid_ind,:]
         wexp , s, R, t3d, fe = fit.fit_exp(x, meanface, expPC,ini_wexp, max_iter = max_iter)
         n = X_ind.shape[0]
-        X = meanface + np.dot(expPC, wexp)
+        X = meanface + np.dot(expPC, wexp[:, np.newaxis])
         X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
         t2d = np.array(t3d[:2])
         P = np.array([[1,0,0] , [0, 1, 0]], dtype = np.float32)
@@ -215,8 +234,16 @@ class  MorphabelModel(object):
 
         X = A.dot(X)
         X = X + np.tile(t2d[:, np.newaxis], [1, n])
-        print(X.shape)
         return X.T, wexp, s, R, t3d, fe
+
+    def fit_expression_2D(self, x, X_ind, ini_wexp,  max_iter = 4):
+        
+
+        meanface = self.model['shapeMU']
+        expPC = self.model['expPC']
+        wexp , s, R, t3d, fe, new_ind = fit.fit_exp_2D(x, X_ind, meanface, expPC,ini_wexp, self.model['face_ind'], max_iter = max_iter)
+        return  wexp, s, R, t3d, fe, new_ind
+
 
 
     def fit_color(self, x_colors, X_ind):

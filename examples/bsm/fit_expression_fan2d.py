@@ -1,7 +1,8 @@
-''' 3d morphable model example
+''' fit abitary expression of subject with user-specific blendshapes
 3dmm parameters --> mesh 
 fitting: 2d image + 3dmm -> 3d face
-use dlib for feature landmark detection
+use fan_2D for feature landmark detection
+update convex indices each iteration
 '''
 import os, sys
 import subprocess
@@ -32,7 +33,7 @@ bsm = MorphabelModel('../Data/BSM/config', model_type = 'BSM')
 print('init bsm model success')
 #detector = dlib.get_frontal_face_detector()
 #predictor = dlib.shape_predictor('../Data/dlib/shape_predictor_68_face_landmarks.dat')
-fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._3D, flip_input=False)
+fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False)
 
 
 
@@ -48,32 +49,16 @@ kp_mask = np.ones(len(X_ind), dtype = bool)
 kp_mask[17:27] = False
 X_ind = X_ind[kp_mask]
 
-folder = 'qz_3D/'
+folder = 'xd_2D/'
 
 # ------ light setup
 print("nver", bsm.nver)
 colors = np.tile([0.8,0.2,0.2],(int(bsm.nver),1))
-light_intens = np.array([[1.0 ,1.0 ,1.0]])
-light_pos = np.array([[0, 0, 1000]])
-light_pos2 = np.array([[-700, 0, 1000]])
-light_pos3 = np.array([[700,0 , 1000]])
-light_pos4 = np.array([[0, -700 , 1000]])
+light_intens = np.array([[1.0 ,1.0 ,1.0]]) / 3
+light_pos = np.array([[0, 0, 1000],[-700, 0, 1000], [700, 0 ,1000],[0, -700, 1000]])
 
 
-
-
-
-# --- 2. video setup
-#cap = cv2.VideoCapture("../Data/videoplayback.mp4")
-#fps = cap.get(cv2.CAP_PROP_FPS)
-#w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-#fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
-
-#for img in images:
-# for cnt, img in enumerate(images)
 fes = []
-
 
 
 path = folder + "result/wexpl.out"
@@ -116,13 +101,20 @@ for idx, img in enumerate(imgs):
     x[:,0] = x[:, 0] - w / 2.0
     x[:,1] = h / 2.0 - x[:, 1] - 1
     x = x[kp_mask]
-    X, wexp, s, R, t3d,fe = bsm.fit_expression(x, X_ind,  wexpl[idx], max_iter = 30)
+    wexp, s, R, t3d,fe, new_ind = bsm.fit_expression_2D(x, X_ind,  wexpl[idx], max_iter = 30)
     wexpl[idx][1:] = wexp
     fes.append(fe)
-    X = np.array(X)
+
+    valid_ind = bsm.get_valid_ind(new_ind)
+    X = bsm.generate_expression_mesh(wexp, valid_ind)
+    X = np.reshape(X, [int(3), int(len(X)/ 3)], 'F').T 
+    X = bsm.similarity_transform(X, s, R, t3d)
+    #image_X = mesh.transform.to_image(trans_X, h, w).astype('u1')
+
     X[:,0] = X[:, 0] + w / 2.0
     X[:,1] = h / 2.0 - X[:, 1] - 1
     X = X.astype(np.int32)
+    
     for pos in X:
         rr, cc = draw.circle_perimeter(pos[1], pos[0], 2)
         draw.set_color(img, [rr,cc], [0 ,233, 0])
@@ -130,19 +122,14 @@ for idx, img in enumerate(imgs):
     path = folder + "result/fitted_keypoint" + str(idx) + ".jpg"
     cv2.imwrite(path, img)
     path = folder + "result/fitted_mesh" + str(idx) + ".obj"
-    vert = bsm.generate_expression_mesh(wexp) 
+    vert = bsm.generate_expression_mesh(wexp)
     obj.vertices = vert.reshape(-1)
     obj.save(path)
     
     vert = np.reshape(vert, [int(3), int(len(vert)/ 3)], 'F').T 
     trans_vert = bsm.similarity_transform(vert, s, R, t3d)
-    lit_colors1 = mesh.light.add_light(trans_vert, bsm.triangles, colors, light_pos, light_intens)
-    lit_colors2 = mesh.light.add_light(trans_vert, bsm.triangles, colors, light_pos2, light_intens)
-    lit_colors3 = mesh.light.add_light(trans_vert, bsm.triangles, colors, light_pos3, light_intens)
-    lit_colors4 = mesh.light.add_light(trans_vert, bsm.triangles, colors, light_pos4, light_intens)
-    lit_colors = (lit_colors1 + lit_colors2 + lit_colors3 + lit_colors4) / 4
+    lit_colors = mesh.light.add_light(trans_vert, bsm.triangles, colors, light_pos, light_intens)
     
-    image_vertices = mesh.transform.to_image(trans_vert, h, w)
     image_vertices = mesh.transform.to_image(trans_vert, h, w)
 
     fitted_image = mesh.render.render_colors(image_vertices, bsm.triangles, lit_colors, h, w)
@@ -175,9 +162,6 @@ np.savetxt(path, fes)
 wexpl = np.asarray(wexpl)
 path = folder + "result/wexpl.out"
 np.savetxt(path, wexpl)
-
-
-
 
 
 

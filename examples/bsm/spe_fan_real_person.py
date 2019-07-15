@@ -44,7 +44,6 @@ print("triangles shape", bsm.triangles.shape)
 X_ind = bsm.kpt_ind # index of keypoints in 3DMM. fixed.
 
 
-
 folder = 'xd_3D/'
 
 # ------ light setup
@@ -73,7 +72,7 @@ light_pos4 = np.array([[0, -700 , 1000]])
 imgs = []
 xl = []
 
-for i in range(60):
+for i in range(1):
     #path = "../../../facewarehouse_data/Tester_39/TrainingPose/pose_"
     path = "../Data/" + folder + "exp_input"
     path = path + str(i) + ".jpg"
@@ -115,19 +114,15 @@ for idx, img in enumerate(imgs):
     #cv2.imwrite("pose39_3D/face_kpt{}.jpg".format(idx), img_target)
 #fit mesh
 print("{} faces detected".format(len(xl)))
-expPC ,wid, wexpl, sl, Rl, tl= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3)
+expPC ,wid, wexpl, sl, Rl, tl= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3, kp_type= '3D')
 #print("fitted_info",ret)
 #fitted_vertices = np.float32(bsm.generate_vertices(fitted_sp, fitted_ep))
 #np.savetxt("f_ep", fitted_ep)
 #fitted_vertices = np.reshape(bsm.model['expPC'][:,0], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
 #fitted_vertices += np.reshape(bsm.model['expMU'], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
 #np.savetxt('qz/wid_with_update.out', wid)
-X = bsm.show_fitting_result(X_ind, sl, Rl, tl,  wid, wexpl)
 
-X = np.array(X)
-X[:,:,0] = X[:,:, 0] + w / 2.0
-X[:,:,1] = h / 2.0 - X[:,:, 1] - 1
-X = X.astype(np.int32)
+
 obj = objloader.obj.objloader('pose_0.obj')
 for i in range(47):
     vert = expPC[:,i]
@@ -137,21 +132,21 @@ for i in range(47):
 
 
 for idx, img in enumerate(imgs):
-    for pos in X[idx]:
+    X = bsm.show_fitting_result(X_ind, sl[idx], Rl[idx], tl[idx],  wid, wexpl[idx])
+    X = np.array(X)
+    X[:,0] = X[:,0] + w / 2.0
+    X[:,1] = h / 2.0 - X[:, 1] - 1
+    X = X.astype(np.int32)
+    for pos in X:
         rr, cc = draw.circle_perimeter(pos[1], pos[0], 2)
         draw.set_color(img, [rr,cc], [0 ,233, 0])
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     path = folder + "fitted_keypoint" + str(idx) + ".jpg"
     cv2.imwrite(path, img)
     path = folder + "fitted_mesh" + str(idx) + ".obj"
-    vert = bsm.generate_fitting_mesh(wid, wexpl[idx])
+    vert = bsm.generate_bilinear_mesh(wid, wexpl[idx])
+ 
     
-    # normalize
-    #pmax = vert.max()
-    #pmin = vert.min()
-    #vert = (vert - pmin) / (pmax - pmin)
-    
-    # save mesh to .obj file
     obj.vertices = vert
     obj.save(path)
     
@@ -200,5 +195,6 @@ np.savetxt(path, wid)
 path = folder + "wexpl.out"
 
 np.savetxt(path, wexpl)
+
 
 

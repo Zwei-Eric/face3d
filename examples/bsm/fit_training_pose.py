@@ -31,7 +31,7 @@ bsm = MorphabelModel('../Data/BSM/config', model_type = 'BSM')
 print('init bsm model success')
 #detector = dlib.get_frontal_face_detector()
 #predictor = dlib.shape_predictor('../Data/dlib/shape_predictor_68_face_landmarks.dat')
-fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._3D, flip_input=False)
+fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False)
 
 
 
@@ -65,15 +65,12 @@ fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
 
 imgs = []
 xl = []
-while(cap.isOpened()):
-    ret , frame = cap.read()
-    if not ret:
-        print("input images numbers: ", len(imgs))
-        print("load video overed")
-        break;
-    imgs.append(np.array(frame))
-   
- 
+
+for i in range(20):
+    path = "/root/data/facewarehouse_data/Tester_39/TrainingPose/pose_"
+    path = path + str(i) + ".png"
+    img = io.imread(path)
+    imgs.append(img)
 
 #img = io.imread("../Data/qtest1.jpg")
 #imgs.append(img)
@@ -81,8 +78,6 @@ while(cap.isOpened()):
 #imgs.append(img)
 
 for idx, img in enumerate(imgs):
-    if idx % 38 != 0:
-        continue
     img_target = img.copy()[:,:,:3]
     img_target = cv2.cvtColor(img_target, cv2.COLOR_BGR2RGB)
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -97,6 +92,8 @@ for idx, img in enumerate(imgs):
     elif len(faces) != 0:
         for i in range(len(faces)):
             landmarks = faces[i]
+            #print("landmarks shape", faces[i].shape)
+          
             for idx, point in enumerate(landmarks):
                 # position of 68 key points
                 pos = (int(point[0]), int(point[1]))       # notice the size of w:[0,0] h;[0,1]
@@ -112,21 +109,21 @@ for idx, img in enumerate(imgs):
     xl.append(x)
 #fit mesh
 print("{} faces detected".format(len(xl)))
-expPC= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3)
+expPC, wid, ys= bsm.fit_specific_blendshapes(xl, X_ind, max_iter = 3)
 #print("fitted_info",ret)
 #fitted_vertices = np.float32(bsm.generate_vertices(fitted_sp, fitted_ep))
 #np.savetxt("f_ep", fitted_ep)
 #fitted_vertices = np.reshape(bsm.model['expPC'][:,0], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
 #fitted_vertices += np.reshape(bsm.model['expMU'], [int(3), int(len(bsm.model['expMU'])/3)], 'F').T
-#np.savetxt('verices', fitted_vertices)
+np.savetxt('pose39v2/wid_with_update.out', wid)
+#np.savetxt('pose39v2/countour_position.out', ys)
 
+obj = objloader.obj.objloader('pose_0.obj')
 
-
-obj, wid = objloader.obj.objloader('pose_0.obj')
 for i in range(47):
     vert = expPC[:,i]
     obj.vertices = vert
-    obj.save('fat/exp_{}.obj'.format(i))
+    obj.save('pose39v2/exp_{}.obj'.format(i))
 
 #
 #

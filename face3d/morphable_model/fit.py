@@ -7,6 +7,7 @@ from scipy.optimize import minimize
 from . import blendshapes
 from .. import tensor
 from .. import mesh
+from . import blendshapes
 
 ''' TODO: a clear document. 
 Given: image_points, 3D Model, Camera Matrix(s, R, t2d)
@@ -56,7 +57,6 @@ Inference:
 
 '''
 
-
 def fitting_error_wexp(wexp, x, meanface, expPC,  s, R, t2d):
     '''
     Args:
@@ -70,7 +70,7 @@ def fitting_error_wexp(wexp, x, meanface, expPC,  s, R, t2d):
 
     '''
     
-    X = meanface + np.dot(expPC, wexp) 
+    X = meanface + np.dot(expPC, wexp[:, np.newaxis]) 
     
     #X = tensor.dot.mode_dot(core, wexp.T , 2)
     #X = tensor.dot.mode_dot(X, wid.T, 1)
@@ -92,6 +92,97 @@ def fitting_error_wexp(wexp, x, meanface, expPC,  s, R, t2d):
     
     return fe
  
+
+def fit_exp(x, meanface, expPC, ini_exp, max_iter):
+    wexp = ini_exp[1:] # + np.random.rand(core.shape[2]) * 0.1 - 0.05
+
+    x = x.T
+    n = x.shape[1]
+    fe = 99999
+    def_error = fe
+    i = 0
+    while def_error > 0.0001 and i <  max_iter:
+        #print("meanface shape", meanface.shape )
+        #print("expPC shape", expPC.shape)
+        X  = meanface + np.dot(expPC, wexp[:, np.newaxis])
+        #print("X shape", X.shape)
+        X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+
+        P = mesh.transform.estimate_affine_matrix_3d22d(X.T, x.T)
+        s, R, t3d = mesh.transform.P2sRt(P)
+
+        bnds_exp = ((0,1),) * expPC.shape[1]
+        args = (
+            x,
+            meanface,
+            expPC,
+            s,
+            R,
+            t3d[:2]
+        )
+        res = blendshapes.bfgs(fitting_error_wexp, wexp, args = args, bounds= bnds_exp, options = {
+                'disp': False, 'maxcor': 10, 'ftol': 2.220446049250313e-09, 'gtol': 1e-05, 'eps': 1e-08, 'maxfun': 15000,
+                'maxiter': 15000, 'iprint': -1, 'maxls': 20
+        
+        })
+        wexp = res.x.reshape((-1))
+        def_error = np.abs(fe - np.sqrt(res.fun) / n)
+        fe = np.sqrt(res.fun) / n 
+        print("expression fitting error in iteration {}:".format(i), fe)
+        i = i + 1
+    return wexp, s, R, t3d, fe
+
+
+
+
+def fit_exp_2D(x, X_ind,  meanface, expPC, ini_exp, face_ind, max_iter):
+    '''
+        fit expression with user-specific blendshapes and update face convex keypoints' indices each iteration
+    '''
+    wexp = ini_exp[1:] # + np.random.rand(core.shape[2]) * 0.1 - 0.05
+
+    x = x.T
+    n = x.shape[1]
+    fe = 99999
+    def_error = fe
+    i = 0
+    new_ind = X_ind
+    face_mesh  = meanface + np.dot(expPC, wexp[:,np.newaxis])
+    #for i in range(max_iter):
+    while def_error > 0.0001 and i <  max_iter:
+        valid_ind = blendshapes.get_valid_ind(new_ind)
+        meanface_samples = meanface[valid_ind]
+        expPC_samples = expPC[valid_ind,:]
+        X  = meanface_samples + np.dot(expPC_samples, wexp[:, np.newaxis])
+        #print("X shape", X.shape)
+        X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+
+        P = mesh.transform.estimate_affine_matrix_3d22d(X.T, x.T)
+        s, R, t3d = mesh.transform.P2sRt(P)
+
+        bnds_exp = ((0,1),) * expPC.shape[1]
+        args = (
+            x,
+            meanface_samples,
+            expPC_samples,
+            s,
+            R,
+            t3d[:2]
+        )
+        res = blendshapes.bfgs(fitting_error_wexp, wexp, args = args, bounds= bnds_exp, options = {
+                'disp': False, 'maxcor': 10, 'ftol': 2.220446049250313e-09, 'gtol': 1e-05, 'eps': 1e-08, 'maxfun': 15000,
+                'maxiter': 15000, 'iprint': -1, 'maxls': 20
+        
+        })
+        wexp = res.x.reshape((-1))
+        def_error = np.abs(fe - np.sqrt(res.fun) / n)
+        fe = np.sqrt(res.fun) / n 
+        print("expression fitting error in iteration {}:".format(i), fe)
+        i = i + 1
+        new_ind = blendshapes.update_contour_indices(face_mesh, s, R, t3d[:2], x.T , new_ind, face_ind) # differnce between before or after loop ?
+
+    return wexp, s, R, t3d, fe, new_ind
+
 
 
 def estimate_shape(x, shapeMU, shapePC, shapeEV, expression, s, R, t2d, lamb = 3000):
@@ -239,54 +330,6 @@ def estimate_expression_bsm(x, shapeMU, expPC, expEV, s, R, t2d, lamb = 2000):
     exp_para = np.dot(np.linalg.inv(equation_left), equation_right)
     
     return exp_para
-
-def fit_exp(x, meanface, expPC, ini_exp, max_iter):
-    wexp = ini_exp[1:] # + np.random.rand(core.shape[2]) * 0.1 - 0.05
-    #wexp = np.random.rand(core.shape[2])
-    #X = tensor.dot.mode_dot(core, wexp.T, 2)
-    #X = tensor.dot.mode_dot(X, wid.T, 1)
-    #X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
-    
-    #X  = np.dot(expPC, wexp)
-    #X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
-    
-
-    x = x.T
-    n = x.shape[1]
-    fe = 99999
-    def_error = fe
-    i = 0
-    #for i in range(max_iter):
-    while def_error > 0.0001 and i <  max_iter:
-        #print("meanface shape", meanface.shape )
-        #print("expPC shape", expPC.shape)
-        X  = meanface + np.dot(expPC, wexp)
-        #print("X shape", X.shape)
-        X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
-
-        P = mesh.transform.estimate_affine_matrix_3d22d(X.T, x.T)
-        s, R, t3d = mesh.transform.P2sRt(P)
-
-        bnds_exp = ((0,1),) * expPC.shape[1]
-        args = (
-            x,
-            meanface,
-            expPC,
-            s,
-            R,
-            t3d[:2]
-        )
-        res = blendshapes.bfgs(fitting_error_wexp, wexp, args = args, bounds= bnds_exp, options = {
-                'disp': False, 'maxcor': 10, 'ftol': 2.220446049250313e-09, 'gtol': 1e-05, 'eps': 1e-08, 'maxfun': 15000,
-                'maxiter': 15000, 'iprint': -1, 'maxls': 20
-        
-        })
-        wexp = res.x.reshape((-1))
-        def_error = np.abs(fe - np.sqrt(res.fun) / n)
-        fe = np.sqrt(res.fun) / n 
-        print("expression fitting error in iteration {}:".format(i), fe)
-        i = i + 1
-    return wexp, s, R, t3d, fe
 
 # ---------------- fit 
 def fit_points(x, X_ind, model, n_sp, n_ep, max_iter = 4):
@@ -439,8 +482,8 @@ def fit_points_BSM(x, X_ind, model, n_ep, max_iter = 4):
         #----- estimate pose
         P = mesh.transform.estimate_affine_matrix_3d22d(X.T, x.T)
         s, R, t = mesh.transform.P2sRt(P)
-        fe = fitting_error(x, X, s, R, t[:2])
-        print("fitting error:", fe)
+        #fe = fitting_error(x, X, s, R, t[:2])
+        #print("fitting error:", fe)
         rx, ry, rz = mesh.transform.matrix2angle(R)
         print('Iter:{}; estimated pose: s {}, rx {}, ry {}, rz {}, t1 {}, t2 {}'.format(i, s, rx, ry, rz, t[0], t[1]))
 
@@ -452,5 +495,65 @@ def fit_points_BSM(x, X_ind, model, n_ep, max_iter = 4):
         ep = estimate_expression_bsm(x, shapeMU, expPC, shapeEV, s, R, t[:2], lamb = 20 )
         #print("exp para", ep[:20])
     return ep, s, R, t
+
+def fit_exp_bfgs(x, X_ind, wid, model, max_iter=4):
+    '''
+    Args:
+        x: (n, 2) image points
+        X_ind: (n,) corresponding Model vertex indices
+        max_iter: iteration
+    Returns:
+    '''
+    # -- init
+    # -------------------- estimate
+    X_ind_all = np.tile(X_ind[np.newaxis, :], [3, 1]) * 3
+    X_ind_all[1, :] += 1
+    X_ind_all[2, :] += 2
+    valid_ind = X_ind_all.flatten('F')
+
+
+    core = model['core'][valid_ind, :, :]
+  
+    wexp = np.random.rand(core.shape[2])
+    n = x.shape[0]
+ 
+    for i in range(max_iter):
+        fe = 0
+        #Ml = []
+        #Ql = []
+        #shapePC_l = []
+        X = tensor.dot.mode_dot(core, wid.T, 1)
+        X = tensor.dot.mode_dot(X, wexp.T ,1)
+        X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+        x = x.T 
+
+        P = mesh.transform.estimate_affine_matrix_3d22d(X.T, x.T)
+        s, R, t = mesh.transform.P2sRt(P)
+            #----- estimate wid & wexp
+            # shape wid
+            #shapePC = tensor.dot.mode_dot(core, wexpl[j].T ,2)
+            
+       
+       
+        bnds_exp = ((0,1),) * core.shape[2]
+        args = (  # a_star, M, Q, x, X
+            x,
+            core,
+            wid,
+            #Q,
+            #posit_M
+            s,
+            R,
+            t[:2]
+        )
+        res = bfgs(fitting_error_wexp, wexp, args=args, bounds=bnds_exp, options={
+            'disp': False, 'maxcor': 10, 'ftol': 2.220446049250313e-09, 'gtol': 1e-05, 'eps': 1e-08, 'maxfun': 15000,
+            'maxiter': 15000, 'iprint': -1, 'maxls': 20
+        })
+        wexp = res.x.reshape((-1))
+        print("image {} single exp error:".format(j), np.aqrt(res.fun / m) ) 
+       
+
+    return wexp
 
 
