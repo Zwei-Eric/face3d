@@ -73,8 +73,54 @@ def find_closest(X, idx, x):
 
         
 
+def update_contour_indices(X, s, R, t2d, x, X_ind, face_ind):
+    X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+    #print("face mesh shape", X.shape)
+    n = X.shape[1]
+    
+    t2d = np.array(t2d)
+    P = np.array([[1, 0, 0], [0, 1, 0]], dtype = np.float32)
+    A = s*P.dot(R)
+    
+    X = A.dot(X)
+    X = X + np.tile(t2d[:, np.newaxis], [1, n]) # 2 x n
+    
+    X_c = np.zeros(X.shape)
+    
+    X_c[:,face_ind] = X[:, face_ind]
+    
+    #kp = X_c.T[X_ind]
+    
+    X = X.T
+    X_c = X_c.T 
+    mean = np.mean(X_c, axis = 0)
 
+    hull = spatial.ConvexHull(X_c)
+    idx = np.append(hull.vertices, X_ind[:17]) # add inital key point indices 
+    #idx = hull.vertices
+    for i in range(3):
+        X_c[hull.vertices] = mean
+        hull2 = spatial.ConvexHull(X_c)
+        idx = np.append(idx, hull2.vertices)
+        #for simplex in hull.simplices:
+        #    plt.plot(X[simplex, 0], X[simplex, 1],'bo')
+        hull = hull2
 
+    #plt.plot(X[idx, 0], X[idx, 1], 'bo')
+    #for simplex in hull2.simplices:
+    #    plt.plot(X[simplex, 0], X[simplex, 1],'bo')
+   
+    #print('x shape', x[:17,:].shape)
+    new_ind = find_closest(X, idx ,x[:17,:])
+    #print('new ind shape', new_ind.shape)
+    new_X_ind = X_ind.copy()
+    new_X_ind[:17] = new_ind
+    #y = X[new_ind]
+    #plt.plot(kp[:,0], kp[:,1], 'co')
+    return new_X_ind
+
+   
+    
 
 def update_contour_idx(core, wid, wexp, s, R, t2d, x, X_ind, face_ind):
     '''
@@ -112,6 +158,7 @@ def update_contour_idx(core, wid, wexp, s, R, t2d, x, X_ind, face_ind):
 
     hull = spatial.ConvexHull(X_c)
     idx = np.append(hull.vertices, X_ind[:17])
+    #idx = hull.vertices
     for i in range(3):
         X_c[hull.vertices] = mean
         hull2 = spatial.ConvexHull(X_c)
@@ -132,7 +179,7 @@ def update_contour_idx(core, wid, wexp, s, R, t2d, x, X_ind, face_ind):
     return new_X_ind, y
 
     
-def fitting_error_overall(wid, xl, corel, wexpl, sl, Rl, t2dl):
+def fitting_error_overall(wid, xl, corel, wexpl, sl, Rl, t3dl):
     '''
     Args:
         xl: m * (2, n) image points
@@ -158,14 +205,14 @@ def fitting_error_overall(wid, xl, corel, wexpl, sl, Rl, t2dl):
         mask = np.ones(n, dtype = bool)
         mask[18:27] = False
     
-        t2d = np.array(t2dl[i])
+        t2d = np.array(t3dl[i][:2])
         P = np.array([[1, 0, 0], [0, 1, 0]], dtype = np.float32)
         A = sl[i]*P.dot(Rl[i])
     
         X = A.dot(X)
         X = X + np.tile(t2d[:, np.newaxis], [1, n]) # 2 x n
     
-        sfe = np.linalg.norm(X.T[mask] - x.T[mask])  
+        sfe = np.linalg.norm(X.T[mask] - x.T[mask]) ** 2 
         fe += sfe
     
       
@@ -201,7 +248,7 @@ def fitting_error_wid(wid, x, core, wexp, s, R, t2d):
     
     X = A.dot(X)
     X = X + np.tile(t2d[:, np.newaxis], [1, n]) # 2 x n
-    fe = np.linalg.norm(X.T[mask] - x.T[mask])  
+    fe = np.linalg.norm(X.T[mask] - x.T[mask]) ** 2 
     return fe
 
 def fitting_error_wexp(wexp, x, core, wid,  s, R, t2d):
@@ -229,7 +276,7 @@ def fitting_error_wexp(wexp, x, core, wid,  s, R, t2d):
     
     X = A.dot(X)
     X = X + np.tile(t2d[:, np.newaxis], [1, n]) # 2 x n
-    fe = np.linalg.norm(X.T[mask] - x.T[mask]) 
+    fe = np.linalg.norm(X.T[mask] - x.T[mask]) ** 2
     
 
     return fe
@@ -337,7 +384,7 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
             s, R, t = mesh.transform.P2sRt(P)
             sl.append(s)
             Rl.append(R)
-            tl.append(t[:2])
+            tl.append(t)
             #----- estimate wid & wexp
             # shape wid
             
@@ -395,10 +442,12 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
         })
         wid = res.x.reshape((-1))
         print("iter " + str(i+1) + " done. E= ", res.fun)
+        new_ind_list = []
         for j in range(len(xl)):
             plt.cla()
-            new_X_ind, y = update_contour_idx(core_base, wid, wexpl[j], sl[j], Rl[j], tl[j], xl[j], X_inds[j], model['face_ind'])
+            new_X_ind, y = update_contour_idx(core_base, wid, wexpl[j], sl[j], Rl[j], tl[j][:2], xl[j], X_inds[j], model['face_ind'])
             X_inds[j] = new_X_ind
+            new_ind_list.append(new_X_ind)
             ys[i][j] = y
             #print('new ind after update', new_X_ind[:17])
             plt.plot(xl[j][:,0], xl[j][:,1], 'r+')
@@ -408,12 +457,43 @@ def fit_id_param_bfgs(xl, X_ind, model, max_iter=4):
             k = 17
             plt.plot( [xl[j][:k,0], y[:k,0]], [xl[j][:k,1], y[:k,1]], color = 'g')
             plt.axis("equal")
-            plt.savefig('qz/scatter_img{}_iter{}.jpg'.format(j,i))
+            plt.savefig('xd_2D/scatter_img{}_iter{}.jpg'.format(j,i))
             
             #fe = fitting_error_wid(wid, xl[j].T, corel[j], wexpl[j], sl[j], Rl[j], tl[j])
             #print("1: single image {} error after change ind".format(j), fe)
             #fe = np.linalg.norm(xl[j][:k] - y) ** 2
             #print("2: single image {} error after change ind".format(j), fe)
-    return wid ,wexpl, sl, Rl, tl
+    return wid ,wexpl, sl, Rl, tl, new_ind_list
 
+def show_fitting_result(core, s, R, t3d, wid, wexp, kpoint_num):
+    
+    
+#    X_ind_all = np.tile(X_ind[np.newaxis, :], [3, 1]) * 3
+#    X_ind_all[1, :] += 1
+#    X_ind_all[2, :] += 2
+#    valid_ind = X_ind_all.flatten('F')
+#
+#
+#    core = model['core'][valid_ind, :, :]
+#    n = X_ind.shape[0]
+#    m = len(sl)
+#    Xs = []
+#    for i in range(m):
+    X = tensor.dot.mode_dot(core, wexp.T , 2)
+    X = tensor.dot.mode_dot(X, wid.T, 1)
+    X = np.reshape(X, [int(X.shape[0] / 3), 3]).T # 3 x n
 
+    t2d = np.array(t3d[:2])
+    P = np.array([[1, 0, 0], [0, 1, 0]], dtype = np.float32)
+    A = s*P.dot(R)
+
+    X = A.dot(X)
+    X = X + np.tile(t2d[:, np.newaxis], [1, kpoint_num]) # 2 x n
+     
+    X = X.T
+    return X
+
+def generate_bilinear_mesh(core, wid, wexp):
+    X = tensor.dot.mode_dot(core, wexp.T , 2)
+    X = tensor.dot.mode_dot(X, wid.T, 1)
+    return X 

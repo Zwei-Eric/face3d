@@ -6,6 +6,7 @@ import cv2
 from scipy.optimize import minimize
 from .. import tensor
 from .. import mesh
+from . import blendshapes
 
 ''' TODO: a clear document. 
 Given: image_points, 3D Model, Camera Matrix(s, R, t2d)
@@ -54,6 +55,100 @@ Inference:
     (pc' * pc + lambda / (sigma'* sigma)) * sp  = pc' * (x - b)
 
 '''
+
+def fitting_error_wexp(wexp, x, meanface, expPC,  s, R, t2d):
+    '''
+    Args:
+        x: (2, n) image points
+        vertices: (3, n) 
+        M: (3, 4) camera external matrix
+        Q: (3, 3) projection matrix
+
+    Returns:
+        fe : fitting error
+
+    '''
+    
+    X = meanface + np.dot(expPC, wexp[:, np.newaxis]) 
+    
+    #X = tensor.dot.mode_dot(core, wexp.T , 2)
+    #X = tensor.dot.mode_dot(X, wid.T, 1)
+    #X = tensor.dot.mode_dot(core, wid.T, 1)
+    #X = tensor.dot.mode_dot(X, wexp.T , 1)
+    
+    
+    X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+    n = x.shape[1]
+    
+    t2d = np.array(t2d)
+    P = np.array([[1, 0, 0], [0, 1, 0]], dtype = np.float32)
+    A = s*P.dot(R)
+    
+    X = A.dot(X)
+    X = X + np.tile(t2d[:, np.newaxis], [1, n]) # 2 x n
+    fe = np.linalg.norm(X - x) ** 2
+    
+    
+    return fe
+ 
+
+def fit_exp_2D(x, X_ind,  meanface, expPC, ini_exp, face_ind, max_iter):
+    '''
+        fit expression with user-specific blendshapes and update face convex keypoints' indices each iteration
+        
+
+    '''
+    wexp = ini_exp[1:] # + np.random.rand(core.shape[2]) * 0.1 - 0.05
+    #wexp = np.random.rand(core.shape[2])
+    #X = tensor.dot.mode_dot(core, wexp.T, 2)
+    #X = tensor.dot.mode_dot(X, wid.T, 1)
+    #X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+    
+    #X  = np.dot(expPC, wexp)
+    #X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+    
+
+    x = x.T
+    n = x.shape[1]
+    fe = 99999
+    def_error = fe
+    i = 0
+    new_ind = X_ind
+    face_mesh  = meanface + np.dot(expPC, wexp[:,np.newaxis])
+    #for i in range(max_iter):
+    while def_error > 0.0001 and i <  max_iter:
+        valid_ind = blendshapes.get_valid_ind(new_ind)
+        meanface_samples = meanface[valid_ind]
+        expPC_samples = expPC[valid_ind,:]
+        X  = meanface_samples + np.dot(expPC_samples, wexp[:, np.newaxis])
+        #print("X shape", X.shape)
+        X = np.reshape(X, [int(X.shape[0] / 3), 3]).T
+
+        P = mesh.transform.estimate_affine_matrix_3d22d(X.T, x.T)
+        s, R, t3d = mesh.transform.P2sRt(P)
+
+        bnds_exp = ((0,1),) * expPC.shape[1]
+        args = (
+            x,
+            meanface_samples,
+            expPC_samples,
+            s,
+            R,
+            t3d[:2]
+        )
+        res = blendshapes.bfgs(fitting_error_wexp, wexp, args = args, bounds= bnds_exp, options = {
+                'disp': False, 'maxcor': 10, 'ftol': 2.220446049250313e-09, 'gtol': 1e-05, 'eps': 1e-08, 'maxfun': 15000,
+                'maxiter': 15000, 'iprint': -1, 'maxls': 20
+        
+        })
+        wexp = res.x.reshape((-1))
+        def_error = np.abs(fe - np.sqrt(res.fun) / n)
+        fe = np.sqrt(res.fun) / n 
+        print("expression fitting error in iteration {}:".format(i), fe)
+        i = i + 1
+        new_ind = blendshapes.update_contour_indices(face_mesh, s, R, t3d[:2], x.T , new_ind, face_ind) # differnce between before or after loop ?
+
+    return wexp, s, R, t3d, fe, new_ind
 
 
 

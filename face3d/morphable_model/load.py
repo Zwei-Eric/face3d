@@ -73,7 +73,7 @@ def load_BSM(config_path):
     triangles = np.loadtxt(path[2])
     # kpt ind
     kpt_3d = np.loadtxt(path[3])
-    expPC =np.loadtxt(path[4])
+    expPC =np.loadtxt(path[4]).T
     core = np.fromfile(path[5], dtype = float)
     Uexp =  np.loadtxt(path[6])
     face_ind = np.loadtxt(path[7])
